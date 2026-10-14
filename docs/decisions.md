@@ -162,3 +162,30 @@
 - **Consequences:**
   - Complete mitigation of SSRF vulnerabilities.
   - Predictable, secure API behavior.
+
+---
+
+### ADR-011: Supabase Role Compatibility in Migration Execution
+
+- **Status:** Approved (Phase 01)
+- **Context:**
+  Supabase provides built-in roles such as `authenticated` and `anon` upon which RLS policies depend (`TO authenticated`). In standard local PostgreSQL installations used for offline testing, these roles do not exist by default, which causes migration failures during automated testing.
+- **Decision:**
+  In `20261014000002_security_policies.sql`, check for the existence of `authenticated` and `anon` roles and create them conditionally if missing before applying policies.
+- **Consequences:**
+  - Migrations apply seamlessly across both hosted Supabase and local PostgreSQL test harnesses.
+  - No manual role provisioning is needed for automated testing.
+
+---
+
+### ADR-012: Enforcing Cross-Table Ownership in RLS Policies
+
+- **Status:** Approved (Phase 01)
+- **Context:**
+  A user could theoretically attempt to link another owner's title to their own collection or create a bookmark referencing a title they do not own.
+- **Decision:**
+  The RLS `WITH CHECK` and `USING` policies for relationship tables (`title_collections`, `title_tags`, `bookmarks`) explicitly require that `auth.uid()` matches both the collection/bookmark owner and the underlying title's owner.
+- **Consequences:**
+  - Impossible for any authenticated user to tamper with or reference another user's private media library titles.
+  - Strict mathematical guarantees of data isolation even if IDs are leaked or guessed.
+

@@ -53,3 +53,9 @@
 1. **Node.js Runtime:**
    - The current development environment is running Node.js `v26.10.0`.
    - While Node 26 supports modern ESM and TypeScript execution natively, production targets (Vercel, Render) typically run Node 20 or 22 LTS. All dependencies and build targets must remain compatible with Node 20+ LTS standards.
+
+2. **Local Docker & Supabase CLI Environment:**
+   - Docker daemon is currently not running in this environment, which prevents running `npx supabase start` containerized stacks directly.
+   - However, a native PostgreSQL service is running on port 5432 and was used for live migration, seed, and constraint test verification via `npm run test:db`.
+   - To use the local Supabase containerized stack, Docker Desktop / daemon must be started. Hosted Supabase instances work without local Docker.
+

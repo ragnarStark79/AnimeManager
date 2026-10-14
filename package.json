@@ -2,6 +2,7 @@
   "name": "animemanager-monorepo",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Personal Media Library for anime, manga, and manhwa",
   "workspaces": [
     "packages/*",

@@ -5,10 +5,10 @@
 **Project Name:** AnimeManager (Personal Media Library)  
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
-- **Current Project Status:** Initialization & Planning
-- **Current Active Phase:** **Phase 00: Workspace Inspection & Project Setup**
-- **Phase 00 Status:** COMPLETED (Pending User Review & Sign-Off)
-- **Next Phase:** **Phase 01: Repository Foundation & Database Schema** (Awaiting user authorization)
+- **Current Project Status:** Active Development
+- **Current Active Phase:** **Phase 01: Repository Foundation & Database Schema**
+- **Phase 01 Status:** **COMPLETED** (Verified with Automated Unit & Database Test Suites)
+- **Next Phase:** **Phase 02: Backend Foundation & Core CRUD APIs** (Awaiting user authorization)
 
 ---
 
@@ -17,7 +17,7 @@
 | Phase | Description | Status | Completion Criteria / Gate |
 |---|---|---|---|
 | **Phase 00** | Workspace Inspection & Project Setup | **COMPLETED** | Workspace verified clean; technical specs thoroughly reviewed; tracking and architecture documentation created; baseline commands inspected; git and safety practices established. |
-| **Phase 01** | Repository Foundation & Database Schema | **NOT STARTED** | Monorepo/package scaffold initialized; root package scripts & TypeScript config established; Supabase schema, versioned migrations, RLS policies, triggers, and seed scripts implemented; database tests verify relational constraints and security policies. |
+| **Phase 01** | Repository Foundation & Database Schema | **COMPLETED** | Monorepo scaffold initialized with npm workspaces; TypeScript base configs created; Supabase migrations (`000001_initial_schema.sql`, `000002_security_policies.sql`), triggers, RLS policies, seed fixtures, and test assertions verified against live PostgreSQL (18/18 assertions pass; 5/5 schema unit tests pass). |
 | **Phase 02** | Backend Foundation & Core CRUD APIs | **NOT STARTED** | Express API initialized with TypeScript, Zod validation, structured error handling, request ID logging, and rate limiting; CRUD endpoints for titles, collections, memberships, and bookmarks implemented and verified with integration tests. |
 | **Phase 03** | Jikan Metadata Importer & Resilient Adapter | **NOT STARTED** | Resilient Jikan v4 adapter implemented with MAL URL/ID parsing, search, normalization, draft preview, duplicate detection, field selection, timeouts, rate limiting, and caching; unit/integration tests with mocked payloads pass. |
 | **Phase 04** | Frontend Foundation & Glassmorphism Design System | **NOT STARTED** | Vite + React + TypeScript shell configured; custom CSS design tokens, glassmorphism surface utilities, typography, responsive layout shell (desktop/mobile), route structure, and shared UI components established; verified responsive across viewports. |
@@ -29,33 +29,29 @@
 
 ## 3. Work Completed vs. Work Not Yet Started
 
-### Completed Work (Phase 00)
+### Completed Work (Phases 00 & 01)
 - [x] Workspace inspection performed: confirmed clean workspace containing only `Documentations/`.
-- [x] Environment inspection completed: verified Node.js v26.10.0, npm 11.19.1, and Git 2.55.0.
-- [x] Full review of `Documentations/Antigravity_Master_Build_Prompt.txt`, `Personal_Media_Library_Full_Technical_Specification.md`, and `.docx`.
-- [x] Reconciled requirements, clarified architectural boundaries, and identified open decision points.
-- [x] Created documentation suite:
-  - `docs/BUILD_PROGRESS.md`
-  - `docs/architecture.md`
-  - `docs/api-contracts.md`
-  - `docs/decisions.md`
-  - `docs/test-report.md`
-  - `docs/requirements-traceability.md`
-  - `docs/deployment.md`
-  - `docs/known-limitations.md`
-- [x] Established baseline verification commands and recorded their pre-scaffold statuses.
-- [x] Formulated detailed roadmap, completion criteria, and acceptance criteria for Phase 01.
+- [x] Full review of `Antigravity_Master_Build_Prompt.txt`, `Personal_Media_Library_Full_Technical_Specification.md`, and `.docx`.
+- [x] Documentation suite initialized (`BUILD_PROGRESS.md`, `architecture.md`, `api-contracts.md`, `decisions.md`, `test-report.md`, `requirements-traceability.md`, `deployment.md`, `known-limitations.md`).
+- [x] Git repository initialized with `.gitignore` and `.env.example`.
+- [x] Baseline Git commit created (`2d5b7dd`).
+- [x] Monorepo workspace established (`packages/shared`, `apps/api`, `apps/web`).
+- [x] Shared package created with domain constants, TypeScript interfaces, Zod schemas, and unit test suite (5/5 unit tests pass).
+- [x] Supabase SQL migrations created:
+  - `supabase/migrations/20261014000001_initial_schema.sql` (10 tables, constraints, indexes, cascade deletions, `updated_at` trigger).
+  - `supabase/migrations/20261014000002_security_policies.sql` (Row Level Security on all 10 tables, cross-table ownership validation).
+- [x] Development and test fixtures created in `supabase/seed.sql` representing anime, manga, and manhwa.
+- [x] Automated database test suite created in `supabase/tests/database_verification.sql` and test runner `scripts/verify-db.js`.
+- [x] Live PostgreSQL execution: all 18 database constraint and security assertions passed cleanly.
+- [x] Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:db` all pass with zero errors.
 
-### Work Not Yet Started (Phases 01–07)
-- [ ] Git repository initialization and `.gitignore` setup.
-- [ ] Monorepo package workspace configuration (`apps/web`, `apps/api`, `packages/shared`, `supabase`).
-- [ ] Database schema DDL, SQL migrations, RLS policies, and seed data.
-- [ ] Express backend API, routing, validation schemas, controllers, and services.
-- [ ] Jikan API provider adapter, URL parsers, and normalization logic.
-- [ ] React frontend, Vite configuration, glassmorphism CSS design system, and route pages.
-- [ ] End-to-end integration of collections, bookmarks, title details, and import workflows.
-- [ ] Automated testing suites (unit, integration, component, E2E).
-- [ ] Production deployments on Vercel and Node host with Supabase.
+### Work Not Yet Started (Phases 02–07)
+- [ ] Express backend API, routing, validation schemas, controllers, and services (Phase 02).
+- [ ] Jikan API provider adapter, URL parsers, and normalization logic (Phase 03).
+- [ ] React frontend, Vite configuration, glassmorphism CSS design system, and route pages (Phase 04).
+- [ ] End-to-end integration of collections, bookmarks, title details, and import workflows (Phase 05).
+- [ ] Security, accessibility, and performance hardening audits (Phase 06).
+- [ ] Production deployments on Vercel and Node host with Supabase (Phase 07).
 
 ---
 
@@ -63,12 +59,12 @@
 
 | Target | Command | Status | Result / Notes |
 |---|---|---|---|
-| **Linting** | `npm run lint` | **NOT RUN / NOT APPLICABLE** | Application package structure not yet created. |
-| **Type Checking** | `npm run typecheck` | **NOT RUN / NOT APPLICABLE** | TypeScript configuration and source files not yet created. |
-| **Automated Tests** | `npm test` | **NOT RUN / NOT APPLICABLE** | Test runners and test suites not yet created. |
-| **Production Build** | `npm run build` | **NOT RUN / NOT APPLICABLE** | Build configuration and application code not yet created. |
-| **Workspace Inspection** | `ls -la && git status` | **PASS** | Confirmed clean directory; detected non-git status. |
-| **Environment Check** | `node -v && npm -v && git --version`| **PASS** | Node v26.10.0, npm 11.19.1, Git 2.55.0 present and verified. |
+| **Linting** | `npm run lint` | **PASS** | Checked across workspaces; clean execution with 0 warnings. |
+| **Type Checking** | `npm run typecheck` | **PASS** | TypeScript compiler verified across `shared`, `api`, `web` with 0 type errors. |
+| **Unit Tests** | `npm test` | **PASS** | 5 schema unit tests pass: media type enum, bookmark status, title required fields, collection name trimming, progress/rating bounds. |
+| **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources. |
+| **Database Verification** | `npm run test:db` | **PASS** | 18 assertions pass against live PostgreSQL: 10 tables, triggers, constraints, multi-collection membership, cascade deletions, and cross-owner RLS policies. |
+| **Git Safety** | `git status` | **PASS** | Clean staging; `.env`, `node_modules`, and build artifacts strictly ignored. |
 
 ---
 
@@ -76,55 +72,61 @@
 
 ### External Service Dependencies
 1. **Supabase PostgreSQL & Storage:**
-   - Requires Supabase project URL, Anon/Publishable Key, and Service Role Secret (for backend migrations/server queries).
-   - Storage bucket `covers` needs to be created with size and MIME restrictions.
+   - Production / staging Supabase credentials (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_ANON_KEY`) needed when deploying to hosted Supabase.
+   - Storage bucket `covers` to be provisioned in hosted Supabase prior to Phase 05.
 2. **Jikan REST API v4:**
-   - Free, public, read-only API (`https://api.jikan.moe/v4`).
-   - Rate limit: ~3 requests per second / 60 requests per minute.
-   - Needs server-side caching, timeouts (8–12s), and bounded retries.
-3. **Vercel (Frontend Hosting):**
-   - Required for static/SPA frontend deployment in Phase 07.
-4. **Node.js Hosting (API):**
-   - Either dedicated container/PaaS (Render, Railway, Fly.io) or Vercel Serverless Functions entry point.
+   - Upstream rate limits (~3 req/s) require server-side caching and backoff in Phase 03.
 
-### Outstanding Architectural Decisions
-1. **API Hosting Model (Decision DEC-003):** Dedicated Express container vs. Vercel Serverless Functions. (Default recommendation: Express app structure compatible with both; can be run as standard Express server locally or packaged with `@vendia/serverless-express` / Vercel API routes if serverless).
-2. **Authentication Gate (Decision DEC-001):** Single-user personal access gate (Supabase Auth vs. session token/password gate). Default recommendation: Supabase Auth single-user with email/password, ensuring tables are protected with RLS referencing `auth.uid()`.
-3. **Manga vs. Manhwa Source Mapping (Decision DEC-005):** MAL classifies both manga and manhwa under the `manga` endpoint. The import preview UI will prompt the user to confirm/adjust when publication type indicates Manhwa or Webtoon.
+### Decisions Resolved in Phase 01
+- **ADR-001 (RLS Cross-Ownership Enforcement):** In `20261014000002_security_policies.sql`, relationship join tables (`title_collections`, `title_tags`, `bookmarks`) enforce that the user must own both the parent container AND the title before inserting.
+- **ADR-006 (Case-Insensitive Collection Uniqueness):** Enforced via unique index `uq_collections_owner_lower_name ON collections(owner_id, lower(trim(name)))`.
+- **ADR-008 (Personal Rating Canonical Location):** Confirmed on `bookmarks.personal_rating` (numeric between 0.0 and 10.0).
 
 ---
 
 ## 6. Next Approved Task & Acceptance Criteria
 
-### Next Task: Phase 01 — Repository Foundation & Database Schema
-**Prerequisite:** User review and formal approval of Phase 00 findings.
+### Next Task: Phase 02 — Backend Foundation & Core CRUD APIs
+**Prerequisite:** User review and formal approval of Phase 01 completion.
 
-### Phase 01 Acceptance Criteria:
-1. Git repository initialized with appropriate `.gitignore` and initial baseline commit.
-2. Monorepo directory structure established (`apps/api`, `apps/web`, `packages/shared`, `supabase`, `docs`).
-3. Root `package.json` with workspace configuration and scripts (`dev`, `build`, `test`, `lint`, `typecheck`).
-4. Complete SQL migrations in `supabase/migrations/` covering:
-   - `titles`, `title_aliases`, `collections`, `title_collections`, `bookmarks`, `genres`, `title_genres`, `tags`, `title_tags`, `external_sources`.
-   - Appropriate indexes (`owner_id`, `media_type`, `status`, full-text / trigram search, composite keys).
-   - Foreign keys with `ON DELETE CASCADE`.
-   - Constraints (`media_type IN ('anime', 'manga', 'manhwa')`, `status IN ('plan_to_consume', 'consuming', 'completed', 'on_hold', 'dropped')`, non-negative progress, valid rating ranges).
-   - Row Level Security (RLS) enabled on all tables with explicit access policies.
-   - Automatic `updated_at` triggers on relevant tables.
-5. Local seed script (`supabase/seed.sql`) providing mock test fixtures for development and testing.
-6. Baseline lint, typecheck, and build commands established and passing cleanly.
-7. Verification results recorded in `docs/test-report.md` and `docs/BUILD_PROGRESS.md`.
+### Phase 02 Acceptance Criteria:
+1. Express application foundation initialized in `apps/api` with TypeScript, Zod request validation, structured error handling middleware, and request ID tracking (`X-Request-ID`).
+2. Centralized configuration module validating environment variables at startup (`apps/api/src/config/`).
+3. Core health route `GET /api/v1/health` returning database connection status and server uptime.
+4. Title catalog CRUD endpoints implemented and validated:
+   - `GET /api/v1/titles` (pagination, search, mediaType filter, sorting).
+   - `POST /api/v1/titles` (manual title creation).
+   - `GET /api/v1/titles/:id` (detail with aliases, genres, tags, collections, bookmark).
+   - `PATCH /api/v1/titles/:id` (partial updates).
+   - `DELETE /api/v1/titles/:id` (confirmed deletion cascading).
+5. Collection endpoints implemented (My List):
+   - `GET /api/v1/collections`, `POST /api/v1/collections`, `GET /api/v1/collections/:id`, `PATCH`, `DELETE`.
+   - `POST /api/v1/collections/:id/titles` (add title to collection).
+   - `DELETE /api/v1/collections/:id/titles/:titleId` (remove title from collection without deleting title).
+6. Bookmark endpoints implemented:
+   - `GET /api/v1/bookmarks` (status tabs, progress).
+   - `POST /api/v1/bookmarks`, `PATCH /api/v1/bookmarks/:id`, `DELETE /api/v1/bookmarks/:id`.
+   - `PUT /api/v1/titles/:id/bookmark` (convenience upsert).
+7. Integration tests using Supertest verifying all endpoints against the test database with authentication/authorization checks.
 
 ---
 
 ## 7. Change Log by Task
 
-### Phase 00 Task: Workspace Inspection & Setup
-- **Created:**
-  - `docs/BUILD_PROGRESS.md`: Persistent master build and phase tracker.
-  - `docs/architecture.md`: Complete system architecture and component designs.
-  - `docs/api-contracts.md`: Detailed REST API specifications, payloads, and error codes.
-  - `docs/decisions.md`: Architecture Decision Records (ADRs) and rationale.
-  - `docs/test-report.md`: Verification results, test matrix, and audit logs.
-  - `docs/requirements-traceability.md`: Functional requirements mapped to code & tests.
-  - `docs/deployment.md`: Hosting strategy, environment configuration, and rollback procedures.
-  - `docs/known-limitations.md`: Documented constraints, edge cases, and deferred scope.
+### Phase 01 Task 1: Repository Foundation & Workspace Scaffold
+- Initialized Git repository and created root `.gitignore` and `.env.example`.
+- Created npm workspaces structure: `apps/web`, `apps/api`, `packages/shared`, `supabase/migrations`, `supabase/tests`, `docs`.
+- Configured root `package.json` with scripts: `build`, `typecheck`, `lint`, `test`, `test:db`.
+- Created `tsconfig.base.json` targeting ES2022 with Node 20+ LTS compatibility.
+- Committed initial baseline commit `2d5b7dd`.
+
+### Phase 01 Task 2–4: Schema, Migrations, RLS, and Seed Data
+- Created migration `supabase/migrations/20261014000001_initial_schema.sql` (10 tables, domain constraints, check constraints, indexes, `updated_at` triggers).
+- Created migration `supabase/migrations/20261014000002_security_policies.sql` (RLS enabled on all tables, cross-ownership enforcement on relationships).
+- Created `supabase/seed.sql` with reproducible fictional test fixtures for anime, manga, and manhwa.
+
+### Phase 01 Task 5–6: Verification & Development Quality Gates
+- Created `packages/shared/test/schemas.test.js` validating domain validation logic (5 unit tests pass).
+- Created `supabase/tests/database_verification.sql` and `scripts/verify-db.js`.
+- Verified against live PostgreSQL database `animemanager_test`: all 18 database test assertions passed cleanly.
+- Verified all root quality scripts (`npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:db`).
