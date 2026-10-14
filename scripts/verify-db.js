@@ -36,10 +36,22 @@ if (!psqlBin) {
 const dbName = process.env.TEST_DB_NAME || 'animemanager_test';
 const dbUser = process.env.PGUSER || 'ragnar';
 
-console.log(`[verify-db] Connecting to ${dbName} using ${psqlBin}...`);
+// Strict Safety Guard: Never run destructive schema drops on production or personal databases
+if (process.env.NODE_ENV === 'production') {
+  console.error('[verify-db] FATAL: Cannot run destructive test runner in production environment.');
+  process.exit(1);
+}
+
+const disallowedNames = ['postgres', 'production', 'prod', 'defaultdb', 'master', 'main'];
+if (disallowedNames.includes(dbName.toLowerCase()) || !dbName.toLowerCase().endsWith('_test')) {
+  console.error(`[verify-db] FATAL: Destructive test runner target '${dbName}' is not allowed. Target database name MUST end with '_test' (e.g. animemanager_test).`);
+  process.exit(1);
+}
+
+console.log(`[verify-db] Connecting to verified test database ${dbName} using ${psqlBin}...`);
 
 try {
-  // Ensure database exists
+  // Ensure test database exists
   try {
     execSync(`${psqlBin} -U ${dbUser} -d postgres -c "CREATE DATABASE ${dbName};" 2>&1`, { stdio: 'ignore' });
   } catch {

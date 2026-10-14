@@ -1,8 +1,8 @@
 # AnimeManager — System Architecture
 
-**Document Version:** 1.1  
-**Status:** Baseline Architecture Implemented for Phase 01  
-**Implementation State:** Phase 01 Complete (Database Schema, Migrations, RLS, and Workspaces)  
+**Document Version:** 1.2  
+**Status:** Layered Express REST Backend Implemented (Phase 02)  
+**Implementation State:** Phase 01 & Phase 02 Complete (Database Schema, Express API, Owner Scoping, Tests)  
 
 
 ---
@@ -232,20 +232,27 @@ graph LR
     JikanAdapter --> ExtJikan[Jikan REST API]
 ```
 
-### Layers:
-1. **Routing & Middleware:**
-   - CORS, Helmet security headers, Request ID attribution (`X-Request-ID`).
-   - Rate limiting on public and import endpoints.
-   - Authentication middleware validating Supabase JWT or bearer token.
-   - Zod validation middleware parsing `params`, `query`, and `body`.
-2. **Controllers:**
-   - Extract validated DTOs, invoke domain services, format standard JSON envelopes (`{ data, meta }` or `{ error, meta }`).
-3. **Services:**
-   - Domain operations, transactions, business validation (e.g. progress total checks, duplicate external source detection).
-4. **Repositories:**
-   - Data access using Supabase client / PostgreSQL queries.
-5. **Jikan Adapter:**
-   - Encapsulates all third-party MAL API calls. Implements caching, URL parsing, rate limiting, and normalizes external responses into internal draft structures.
+### Layers (Implemented in Phase 02):
+1. **Routing & Middleware (`apps/api/src/middleware/`):**
+   - Helmet security headers with restrictive CSP policies, CORS configured via environment variables.
+   - Request ID attribution via `request-id.middleware.ts` generating or preserving `X-Request-ID`.
+   - Authentication middleware (`auth.middleware.ts`) verifying Supabase JWT tokens via `jsonwebtoken` against `SUPABASE_JWT_SECRET`. Rejects missing, malformed, invalid, or expired tokens with HTTP 401. Derives authenticated `owner_id` and attaches to `req.user`.
+   - Zod validation middleware (`validation.middleware.ts`) validating request `body`, `query`, and `params` against Zod schemas, returning standard HTTP 422 `VALIDATION_ERROR` envelopes.
+   - Centralized error handler (`error.middleware.ts`) mapping `AppError` subclasses (`ValidationError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `DatabaseError`) to stable error codes, suppressing stack traces and sensitive connection strings in production.
+2. **Controllers (`apps/api/src/controllers/`):**
+   - Pure request/response handlers: `health.controller.ts`, `titles.controller.ts`, `collections.controller.ts`, `bookmarks.controller.ts`.
+   - Formats responses using standard JSON envelope `{ data, meta }` or `{ data, pagination, meta }`.
+3. **Services (`apps/api/src/services/`):**
+   - Core domain business logic and validation: `titles.service.ts`, `collections.service.ts`, `bookmarks.service.ts`.
+   - Strictly enforces owner isolation; guarantees cross-owner titles cannot be attached to another user's collection or bookmarked.
+   - Enforces progress bounds (`0 <= progress <= progressTotal`) and personal rating bounds (`0.0 <= personalRating <= 10.0`).
+4. **Repositories (`apps/api/src/repositories/`):**
+   - Database connection pooling managed via `db.ts` with `pg.Pool`.
+   - Fully parameterized queries protecting against SQL injection.
+   - `db.transaction()` executes multi-table mutations (such as title creation with aliases, genres, and tags) inside atomic transactions, rolling back upon error.
+   - `titles.repository.ts`, `collections.repository.ts`, `bookmarks.repository.ts` manage relational SQL operations.
+5. **Jikan Adapter (`apps/api/src/services/import/`):**
+   - Encapsulates third-party MAL API calls (scheduled for Phase 03). Implements caching, URL parsing, rate limiting, and normalizes external responses into internal draft structures.
 
 ---
 

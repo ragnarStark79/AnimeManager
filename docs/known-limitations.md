@@ -52,10 +52,21 @@
 
 1. **Node.js Runtime:**
    - The current development environment is running Node.js `v26.10.0`.
-   - While Node 26 supports modern ESM and TypeScript execution natively, production targets (Vercel, Render) typically run Node 20 or 22 LTS. All dependencies and build targets must remain compatible with Node 20+ LTS standards.
+   - Production targets (Vercel, Render) typically run Node 20 or 22 LTS. All dependencies and build targets remain strictly compatible with Node 20+ LTS standards.
 
-2. **Local Docker & Supabase CLI Environment:**
-   - Docker daemon is currently not running in this environment, which prevents running `npx supabase start` containerized stacks directly.
-   - However, a native PostgreSQL service is running on port 5432 and was used for live migration, seed, and constraint test verification via `npm run test:db`.
-   - To use the local Supabase containerized stack, Docker Desktop / daemon must be started. Hosted Supabase instances work without local Docker.
+2. **Local PostgreSQL & Supabase Environment:**
+   - A local PostgreSQL service running on port 5432 is used for migration, seed, and constraint test verification via `npm run test:db` and `npm run test:api`.
+   - For containerized Supabase CLI stacks, Docker Desktop / daemon must be started. Hosted Supabase instances work without local Docker.
+
+---
+
+## 5. Security & Scope Boundaries
+
+1. **Backend Service-Role Authorization Boundary:**
+   - When the backend connects via a privileged PostgreSQL connection (or Supabase service role), PostgreSQL table-level RLS policies are bypassed by the privileged role.
+   - **Mitigation & Enforcement:** Backend service-layer authorization is strictly mandatory. All database queries in the repository layer enforce `owner_id = $x` in both reads and writes. Cross-owner references (e.g. attaching a title belonging to another user to one's own collection or bookmark) are blocked by explicit ownership validation queries before writes occur. In automated integration tests, attempts by Owner B to access or manipulate Owner A's records return 404 or 403.
+
+2. **Phase 02 Scope Boundaries:**
+   - The Jikan external metadata import endpoints (`/api/v1/import/*`), file upload handlers for custom covers (`/api/v1/uploads/covers`), and backup streaming export (`/api/v1/export/*`) are intentionally not implemented in Phase 02, adhering strictly to the phase boundaries. They are scheduled for Phase 03 and Phase 05 respectively.
+
 

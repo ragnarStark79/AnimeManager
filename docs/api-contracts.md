@@ -1,9 +1,9 @@
 # AnimeManager — REST API Contracts
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Base Path:** `/api/v1`  
-**Status:** Baseline Specification (Phase 00)  
-**Implementation State:** Planned / Pending Phase 02 (Core API) & Phase 03 (Importer)  
+**Status:** Core APIs Implemented (Phase 02)  
+**Implementation State:** Health, Titles, Collections, and Bookmarks Implemented; Jikan Importer, Uploads, and Exports Pending (Phases 03 & 05)  
 
 ---
 
@@ -159,7 +159,20 @@ Partially update title metadata.
 ### `DELETE /api/v1/titles/:id`
 Permanently delete title and its relationships (aliases, tags, collection memberships, bookmark, external sources) via database cascade.
 
-- **Response 204 No Content.**
+- **Query Parameters:**
+  - `confirm` (string, required): Must be `"true"` to execute deletion.
+- **Response 204 No Content:** Successfully deleted.
+- **Response 400 Bad Request:** If `confirm=true` is missing or false:
+```json
+{
+  "error": {
+    "code": "CONFIRMATION_REQUIRED",
+    "message": "Title deletion requires explicit confirmation (?confirm=true)"
+  },
+  "meta": { "requestId": "req_del_1" }
+}
+```
+- **Response 404 Not Found:** If title does not exist or belongs to another owner.
 
 ---
 

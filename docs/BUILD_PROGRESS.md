@@ -6,9 +6,9 @@
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
 - **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 01: Repository Foundation & Database Schema**
-- **Phase 01 Status:** **COMPLETED** (Verified with Automated Unit & Database Test Suites)
-- **Next Phase:** **Phase 02: Backend Foundation & Core CRUD APIs** (Awaiting user authorization)
+- **Current Active Phase:** **Phase 02: Backend Foundation & Core CRUD APIs**
+- **Phase 02 Status:** **COMPLETED** (Verified with Automated API Integration Tests & Quality Gates)
+- **Next Phase:** **Phase 03: Jikan Metadata Importer & Resilient Adapter** (Awaiting user authorization)
 
 ---
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | **Phase 00** | Workspace Inspection & Project Setup | **COMPLETED** | Workspace verified clean; technical specs thoroughly reviewed; tracking and architecture documentation created; baseline commands inspected; git and safety practices established. |
 | **Phase 01** | Repository Foundation & Database Schema | **COMPLETED** | Monorepo scaffold initialized with npm workspaces; TypeScript base configs created; Supabase migrations (`000001_initial_schema.sql`, `000002_security_policies.sql`), triggers, RLS policies, seed fixtures, and test assertions verified against live PostgreSQL (18/18 assertions pass; 5/5 schema unit tests pass). |
-| **Phase 02** | Backend Foundation & Core CRUD APIs | **NOT STARTED** | Express API initialized with TypeScript, Zod validation, structured error handling, request ID logging, and rate limiting; CRUD endpoints for titles, collections, memberships, and bookmarks implemented and verified with integration tests. |
+| **Phase 02** | Backend Foundation & Core CRUD APIs | **COMPLETED** | Express API initialized with TypeScript, Zod validation, structured error handling, request ID logging, security headers (Helmet/CORS), JWT authentication, and owner scoping; CRUD endpoints for titles, collections, memberships, and bookmarks implemented and verified with integration tests (35/35 integration tests pass; 18/18 database assertions pass). |
 | **Phase 03** | Jikan Metadata Importer & Resilient Adapter | **NOT STARTED** | Resilient Jikan v4 adapter implemented with MAL URL/ID parsing, search, normalization, draft preview, duplicate detection, field selection, timeouts, rate limiting, and caching; unit/integration tests with mocked payloads pass. |
 | **Phase 04** | Frontend Foundation & Glassmorphism Design System | **NOT STARTED** | Vite + React + TypeScript shell configured; custom CSS design tokens, glassmorphism surface utilities, typography, responsive layout shell (desktop/mobile), route structure, and shared UI components established; verified responsive across viewports. |
 | **Phase 05** | Product Workflows & End-to-End Integration | **NOT STARTED** | UI connected to backend APIs; manual title creation/editing, collection management, bookmark tracking with progress, cover upload/URL, search/filter/sort, import preview/commit, and JSON/CSV export operational. |
@@ -29,7 +29,7 @@
 
 ## 3. Work Completed vs. Work Not Yet Started
 
-### Completed Work (Phases 00 & 01)
+### Completed Work (Phases 00, 01, & 02)
 - [x] Workspace inspection performed: confirmed clean workspace containing only `Documentations/`.
 - [x] Full review of `Antigravity_Master_Build_Prompt.txt`, `Personal_Media_Library_Full_Technical_Specification.md`, and `.docx`.
 - [x] Documentation suite initialized (`BUILD_PROGRESS.md`, `architecture.md`, `api-contracts.md`, `decisions.md`, `test-report.md`, `requirements-traceability.md`, `deployment.md`, `known-limitations.md`).
@@ -41,12 +41,19 @@
   - `supabase/migrations/20261014000001_initial_schema.sql` (10 tables, constraints, indexes, cascade deletions, `updated_at` trigger).
   - `supabase/migrations/20261014000002_security_policies.sql` (Row Level Security on all 10 tables, cross-table ownership validation).
 - [x] Development and test fixtures created in `supabase/seed.sql` representing anime, manga, and manhwa.
-- [x] Automated database test suite created in `supabase/tests/database_verification.sql` and test runner `scripts/verify-db.js`.
-- [x] Live PostgreSQL execution: all 18 database constraint and security assertions passed cleanly.
-- [x] Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:db` all pass with zero errors.
+- [x] Automated database test suite created in `supabase/tests/database_verification.sql` and hardened test runner `scripts/verify-db.js`.
+- [x] Layered Express API implemented in `apps/api/src`:
+  - `config/`: Validated environment variables via Zod.
+  - `errors/`: Consistent `AppError` taxonomy (`ValidationError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `DatabaseError`).
+  - `middleware/`: Request ID tracking (`X-Request-ID`), Supabase JWT verification (`auth.middleware.ts`), Zod request validation, centralized error handling (`error.middleware.ts`).
+  - `repositories/`: Safe parameterized database access via `pg.Pool`, transaction wrapping (`titles.repository.ts`, `collections.repository.ts`, `bookmarks.repository.ts`).
+  - `services/`: Business rules, case-insensitive collection uniqueness, progress-total validation, owner scoping (`titles.service.ts`, `collections.service.ts`, `bookmarks.service.ts`).
+  - `controllers/` & `routes/`: REST endpoints for Health, Titles (CRUD, search, pagination, sort, confirmed delete), Collections (CRUD, multi-membership, order), and Bookmarks (CRUD, status tabs, upsert).
+- [x] API integration test suite implemented (`apps/api/test/`) using Node test runner and Supertest:
+  - 35/35 integration tests pass covering authentication, owner isolation, cross-owner security, CRUD, pagination, and health.
+- [x] Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:api`, `npm run test:db` all pass with zero errors.
 
-### Work Not Yet Started (Phases 02–07)
-- [ ] Express backend API, routing, validation schemas, controllers, and services (Phase 02).
+### Work Not Yet Started (Phases 03–07)
 - [ ] Jikan API provider adapter, URL parsers, and normalization logic (Phase 03).
 - [ ] React frontend, Vite configuration, glassmorphism CSS design system, and route pages (Phase 04).
 - [ ] End-to-end integration of collections, bookmarks, title details, and import workflows (Phase 05).
@@ -60,8 +67,9 @@
 | Target | Command | Status | Result / Notes |
 |---|---|---|---|
 | **Linting** | `npm run lint` | **PASS** | Checked across workspaces; clean execution with 0 warnings. |
-| **Type Checking** | `npm run typecheck` | **PASS** | TypeScript compiler verified across `shared`, `api`, `web` with 0 type errors. |
+| **Type Checking** | `npm run typecheck` | **PASS** | Strict TypeScript compiler verified across `shared`, `api`, `web` with 0 type errors. |
 | **Unit Tests** | `npm test` | **PASS** | 5 schema unit tests pass: media type enum, bookmark status, title required fields, collection name trimming, progress/rating bounds. |
+| **API Integration Tests** | `npm run test:api` | **PASS** | 35 integration tests pass using Supertest against live database: auth rejection, owner isolation, title CRUD/search/filter, collection uniqueness/membership, bookmark upsert/validation, health endpoint. |
 | **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources. |
 | **Database Verification** | `npm run test:db` | **PASS** | 18 assertions pass against live PostgreSQL: 10 tables, triggers, constraints, multi-collection membership, cascade deletions, and cross-owner RLS policies. |
 | **Git Safety** | `git status` | **PASS** | Clean staging; `.env`, `node_modules`, and build artifacts strictly ignored. |
@@ -86,28 +94,20 @@
 
 ## 6. Next Approved Task & Acceptance Criteria
 
-### Next Task: Phase 02 — Backend Foundation & Core CRUD APIs
-**Prerequisite:** User review and formal approval of Phase 01 completion.
+### Next Task: Phase 03 — Jikan Metadata Importer & Resilient Adapter
+**Prerequisite:** User review and formal approval of Phase 02 completion.
 
-### Phase 02 Acceptance Criteria:
-1. Express application foundation initialized in `apps/api` with TypeScript, Zod request validation, structured error handling middleware, and request ID tracking (`X-Request-ID`).
-2. Centralized configuration module validating environment variables at startup (`apps/api/src/config/`).
-3. Core health route `GET /api/v1/health` returning database connection status and server uptime.
-4. Title catalog CRUD endpoints implemented and validated:
-   - `GET /api/v1/titles` (pagination, search, mediaType filter, sorting).
-   - `POST /api/v1/titles` (manual title creation).
-   - `GET /api/v1/titles/:id` (detail with aliases, genres, tags, collections, bookmark).
-   - `PATCH /api/v1/titles/:id` (partial updates).
-   - `DELETE /api/v1/titles/:id` (confirmed deletion cascading).
-5. Collection endpoints implemented (My List):
-   - `GET /api/v1/collections`, `POST /api/v1/collections`, `GET /api/v1/collections/:id`, `PATCH`, `DELETE`.
-   - `POST /api/v1/collections/:id/titles` (add title to collection).
-   - `DELETE /api/v1/collections/:id/titles/:titleId` (remove title from collection without deleting title).
-6. Bookmark endpoints implemented:
-   - `GET /api/v1/bookmarks` (status tabs, progress).
-   - `POST /api/v1/bookmarks`, `PATCH /api/v1/bookmarks/:id`, `DELETE /api/v1/bookmarks/:id`.
-   - `PUT /api/v1/titles/:id/bookmark` (convenience upsert).
-7. Integration tests using Supertest verifying all endpoints against the test database with authentication/authorization checks.
+### Phase 03 Acceptance Criteria:
+1. Resilient Jikan REST client module implementing timeouts (10s), exponential backoff for HTTP 429/503, and in-memory caching.
+2. SSRF-safe URL parser for MyAnimeList URLs (`myanimelist.net/anime/:id/...` and `myanimelist.net/manga/:id/...`), rejecting any arbitrary external URLs.
+3. Metadata normalization mapping MAL anime and manga payloads into internal draft models (English, original, romanized aliases, release year, status, episode/chapter counts, source score/rank, genres, tags).
+4. MAL manga vs manhwa disambiguation logic with user confirmation flag.
+5. Endpoints:
+   - `GET /api/v1/import/jikan/search`
+   - `GET /api/v1/import/preview`
+   - `POST /api/v1/import/commit`
+6. Community reviews strictly excluded from import payloads.
+7. Automated tests with mocked Jikan payloads verifying normalization, rate-limit backoff, duplicate detection, and network failure fallback.
 
 ---
 
@@ -130,3 +130,17 @@
 - Created `supabase/tests/database_verification.sql` and `scripts/verify-db.js`.
 - Verified against live PostgreSQL database `animemanager_test`: all 18 database test assertions passed cleanly.
 - Verified all root quality scripts (`npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:db`).
+
+### Phase 02: Backend Foundation & Core CRUD APIs
+- Implemented layered architecture in `apps/api/src/`:
+  - `config/index.ts`: Runtime configuration parsed with Zod, safe placeholder handling, zero secrets logged.
+  - `errors/index.ts`: Standardized error hierarchy (`AppError`, `ValidationError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `DatabaseError`).
+  - `repositories/db.ts`: Connection pooling via `pg.Pool`, transaction execution helper `db.transaction()`, health check `db.checkHealth()`.
+  - `middleware/`: Request ID attribution (`X-Request-ID`), Supabase Auth token verification, input validation, centralized error handling.
+  - `repositories/`: Safe parameterized queries with transaction wrappers for titles, collections, and bookmarks.
+  - `services/`: Business validation for title operations, collection case-insensitive uniqueness, bookmark progress/rating rules, and cross-owner scoping.
+  - `controllers/` & `routes/`: REST endpoints for `/health`, `/titles`, `/collections`, and `/bookmarks`.
+- Implemented automated API integration test suite (`apps/api/test/`) using Supertest:
+  - 35/35 integration tests pass cleanly against live database.
+- Hardened database verification script `scripts/verify-db.js` with multi-factor safeguards to prevent targeting non-test databases.
+- Verified full quality suite: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:api`, `npm run test:db`.

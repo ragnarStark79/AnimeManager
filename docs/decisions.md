@@ -189,3 +189,44 @@
   - Impossible for any authenticated user to tamper with or reference another user's private media library titles.
   - Strict mathematical guarantees of data isolation even if IDs are leaked or guessed.
 
+---
+
+### ADR-013: Layered Express Architecture with Node pg Connection Pool and Transaction Boundaries
+
+- **Status:** Approved (Phase 02)
+- **Context:**
+  The backend requires robust, testable, and maintainable data access. Operations like title creation involve inserting a parent title record and multiple child records (`title_aliases`, `title_genres`, `title_tags`) which must commit or fail atomically.
+- **Decision:**
+  Implement a layered Express architecture (`routes` -> `controllers` -> `services` -> `repositories`). Database connections are pooled using `pg.Pool`. An explicit `db.transaction()` helper checks out a dedicated client, executes `BEGIN`, commits upon success, and executes `ROLLBACK` on any error.
+- **Consequences:**
+  - Prevents orphaned child records during partial database write failures.
+  - Guarantees strict query parameterization across all SQL queries to eliminate SQL injection.
+  - Separates HTTP transport concerns from core domain business rules and database queries.
+
+---
+
+### ADR-014: Title Deletion Safety Mechanism via Explicit Confirmation Parameter
+
+- **Status:** Approved (Phase 02)
+- **Context:**
+  Deleting a title cascades to remove aliases, tags, collection memberships, external source mappings, and bookmark tracking. Accidental calls to `DELETE /api/v1/titles/:id` could result in irreversible loss of user tracking data.
+- **Decision:**
+  Require an explicit query parameter `?confirm=true` on `DELETE /api/v1/titles/:id`. If the confirmation parameter is omitted or false, the API rejects the request with HTTP 400 Bad Request (`CONFIRMATION_REQUIRED`).
+- **Consequences:**
+  - Protects users from accidental destructive API calls.
+  - Enforces that frontend clients implement a deliberate confirmation step before sending the delete command.
+
+---
+
+### ADR-015: Server-Side Owner Scoping Independent of Client Parameters
+
+- **Status:** Approved (Phase 02)
+- **Context:**
+  Client requests could maliciously or erroneously include an `owner_id` or attempt to associate entities belonging to different owners.
+- **Decision:**
+  The server strictly extracts `owner_id` from the cryptographically verified JWT token (`req.user.id`). Any `owner_id` passed in request bodies, query strings, or URL parameters is completely ignored. Furthermore, all relationship mutations (such as adding a title to a collection or creating a bookmark) perform server-side checks ensuring that the caller owns both the parent and target entities.
+- **Consequences:**
+  - Guarantees complete data privacy and isolation across tenants.
+  - Prevents horizontal privilege escalation even if an attacker guesses valid resource UUIDs.
+
+

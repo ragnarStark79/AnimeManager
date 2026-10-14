@@ -1,7 +1,7 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.1  
-**Phase:** Phase 01 (Repository Foundation & Database Schema)  
+**Document Version:** 1.2  
+**Phase:** Phase 02 (Backend Foundation & Core CRUD APIs)  
 **Date:** 2026-10-14  
 
 ---
@@ -12,16 +12,19 @@ This document serves as the authoritative, ongoing record of all automated test 
 
 During **Phase 01**, the monorepo workspace was established and verified. Database migrations, constraints, triggers, RLS policies, and seed fixtures were implemented and tested against a live PostgreSQL database (`animemanager_test`). All unit tests and database assertions passed with 100% success.
 
+During **Phase 02**, the Express REST backend was implemented with layered architecture (`app.ts`, `server.ts`, `config/`, `routes/`, `controllers/`, `services/`, `repositories/`, `middleware/`, `errors/`, `schemas/`), validated with Zod, and secured with Supabase JWT verification and owner scoping. An integration test suite using Node's test runner and Supertest verified all protected routes, cross-owner security boundaries, title CRUD and search, collection uniqueness and membership, bookmark tracking and upserts, and health endpoints. All 35 API integration tests passed with 100% success.
+
 ---
 
-## 2. Phase 01 Quality Gate Verification Matrix
+## 2. Quality Gate Verification Matrix (Phases 01 & 02)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Unit Tests** | `npm test` | Node test runner verifies Zod domain schemas | 5/5 unit tests passed | **PASS** |
+| **Unit Tests** | `npm test` | Node test runner verifies Zod domain schemas and API tests | 5/5 shared unit tests, 35/35 API tests pass | **PASS** |
+| **API Integration Tests**| `npm run test:api` | Supertest integration test suite against live database | 35/35 integration assertions passed cleanly | **PASS** |
 | **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
 
@@ -123,15 +126,70 @@ $ npm run build
 # Exit code: 0
 ```
 
+### 3.5 API Integration Test Suite (`npm run test:api`)
+```shell
+$ npm run test:api
+
+> animemanager-monorepo@1.0.0 test:api
+> npm --prefix apps/api test
+
+> @animemanager/api@1.0.0 test
+> node --test test/**/*.test.js
+
+✔ Authentication: Protected routes reject requests without Authorization header (23.544791ms)
+✔ Authentication: Protected routes reject malformed Authorization header (5.380458ms)
+✔ Authentication: Protected routes reject invalid JWT signature (3.24225ms)
+✔ Authentication: Protected routes reject expired JWT token (1.401791ms)
+✔ Authentication: Valid token succeeds and accesses caller library (22.78975ms)
+✔ Authorization & Privacy: Owner B cannot access Owner A private title detail (2.365375ms)
+✔ Authorization & Privacy: Owner B cannot mutate Owner A title (9.181958ms)
+✔ Authorization: Owner B cannot attach Owner A title to Owner B collection (5.50425ms)
+✔ Authorization: Owner B cannot create a bookmark for Owner A title (2.413125ms)
+✔ Authorization: Client-supplied owner_id in request body is strictly ignored (8.391875ms)
+✔ Bookmarks API: List bookmarks with status filters (56.992917ms)
+✔ Bookmarks API: Create a bookmark for a title without one (18.28475ms)
+✔ Bookmarks API: Reject duplicate bookmark creation for same title (3.09625ms)
+✔ Bookmarks API: Reject negative progress and invalid rating (2.853667ms)
+✔ Bookmarks API: Reject progress exceeding progressTotal (6.277042ms)
+✔ Bookmarks API: Update bookmark progress and rating (7.834708ms)
+✔ Bookmarks API: Upsert bookmark via PUT /titles/:id/bookmark (2.441959ms)
+✔ Bookmarks API: Delete bookmark preserves the title (7.465791ms)
+✔ Collections API: List collections with titleCount summaries (53.195417ms)
+✔ Collections API: Create a new custom collection (9.91775ms)
+✔ Collections API: Reject case-insensitive duplicate collection names per owner (3.968458ms)
+✔ Collections API: Add titles to collection (multi-collection membership) (33.695ms)
+✔ Collections API: Remove title from collection preserves title and bookmark (3.944458ms)
+✔ Collections API: Delete collection preserves titles and bookmarks (7.175833ms)
+✔ Health API: GET /api/v1/health returns system and database status (81.171791ms)
+✔ Middleware: X-Request-ID header is preserved when supplied (2.084708ms)
+✔ Error Handling: Unknown endpoints return consistent 404 envelope (2.151166ms)
+✔ Titles API: List seed titles with pagination and metadata (54.642375ms)
+✔ Titles API: Search across english_title, original_title, and aliases (9.943583ms)
+✔ Titles API: Filter by mediaType (4.852917ms)
+✔ Titles API: Sorting support by title and releaseYear (10.592667ms)
+✔ Titles API: Create a manual title with aliases, genres, and tags (16.73625ms)
+✔ Titles API: Reject creation with invalid media type or missing required fields (3.214041ms)
+✔ Titles API: Update existing title (4.355084ms)
+✔ Titles API: Delete title requires explicit confirmation (6.394375ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30599.358375
+```
+
 ---
 
-## 4. Planned Testing Matrix (Phases 02–07)
+## 4. Planned Testing Matrix (Phases 01–07)
 
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
     Comp[Component Tests<br/>Vitest + RTL - Phase 04]
-    Int[API Integration Tests<br/>Supertest / Vitest - Phase 02]
+    Int[API Integration Tests<br/>Supertest / 35 Passed - Phase 02 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
 
@@ -143,7 +201,7 @@ graph TD
 
 - [x] **Phase 01: Unit Tests (Schemas & Enums):** 5/5 PASSED.
 - [x] **Phase 01: Database Verification Suite:** 18/18 PASSED.
-- [ ] **Phase 02: API Integration Tests (Supertest):** Titles, collections, bookmarks, health, and error semantics.
+- [x] **Phase 02: API Integration Tests (Supertest):** 35/35 PASSED (Titles, Collections, Bookmarks, Health, Auth, Cross-Owner Isolation, Confirmation, Error envelopes).
 - [ ] **Phase 03: Jikan Provider Adapter Mock Tests:** URL parsing, search/detail normalization, duplicate detection, 429 backoff, and network timeouts.
 - [ ] **Phase 04: Component & Responsive Tests:** Glassmorphism UI tokens, navigation shell, responsive viewports (360px, 768px, 1024px, 1440px).
 - [ ] **Phase 05: Core User Journeys E2E (Playwright):** Journeys A through E end-to-end in browser.

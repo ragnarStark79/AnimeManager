@@ -1,0 +1,47 @@
+import type { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { config } from '../config/index.js';
+import { UnauthorizedError } from '../errors/index.js';
+
+interface JwtPayload {
+  sub: string;
+  email?: string;
+  role?: string;
+  [key: string]: unknown;
+}
+
+export function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    throw new UnauthorizedError('Authentication token is required');
+  }
+
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+    throw new UnauthorizedError('Malformed Authorization header; expected "Bearer <token>"');
+  }
+
+  const token = parts[1];
+
+  try {
+    const decoded = jwt.verify(token, config.SUPABASE_JWT_SECRET) as JwtPayload;
+
+    if (!decoded || !decoded.sub || typeof decoded.sub !== 'string') {
+      throw new UnauthorizedError('Invalid token claims: subject identifier (sub) missing');
+    }
+
+    req.user = {
+      id: decoded.sub,
+      email: decoded.email,
+      role: decoded.role,
+    };
+
+    next();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      throw err;
+    }
+    throw new UnauthorizedError('Invalid or expired authentication token');
+  }
+}
