@@ -252,7 +252,13 @@ graph LR
    - `db.transaction()` executes multi-table mutations (such as title creation with aliases, genres, and tags) inside atomic transactions, rolling back upon error.
    - `titles.repository.ts`, `collections.repository.ts`, `bookmarks.repository.ts` manage relational SQL operations.
 5. **Jikan Adapter (`apps/api/src/services/import/`):**
-   - Encapsulates third-party MAL API calls (scheduled for Phase 03). Implements caching, URL parsing, rate limiting, and normalizes external responses into internal draft structures.
+   - Implemented in Phase 03:
+     - `url-parser.ts`: Strict SSRF-safe URL parser for MyAnimeList URLs (`https://myanimelist.net/anime/{id}` and `/manga/{id}`). Validates protocol, hostname, port, and path shape.
+     - `cache.ts`: `BoundedTtlCache` implementing TTL expiration (10m default) and LRU eviction (500 entries max) to prevent unbounded memory growth.
+     - `throttler.ts`: `RequestThrottler` enforcing ~3 req/s spacing between outbound upstream requests.
+     - `jikan.client.ts`: Resilient HTTP client with bounded exponential backoff for HTTP 429 and 503, honoring `Retry-After`, 10s request timeout, `redirect: 'error'`, non-retryable 4xx rejection, and test fetch injection hooks.
+     - `normalizer.ts`: Maps upstream payloads into domain `ImportDraft`. Classifies explicit manhwa, flags ambiguous manga/manhwa with warnings and `needsMediaConfirmation`, deduplicates aliases/genres/tags, and strictly excludes community reviews.
+     - `import.service.ts`: Orchestrates candidate search, read-only preview with duplicate detection against `external_sources`, and atomic transactional commit enforcing server-side field selection.
 
 ---
 
@@ -282,18 +288,35 @@ graph LR
 
 ## 6. Jikan Integration & SSRF Protection
 
-### URL Safety Architecture:
-To prevent Server-Side Request Forgery (SSRF), the application **never** performs direct HTTP fetches of user-supplied URLs.
-1. When a user provides a MyAnimeList URL, the backend URL parser regex-validates the hostname against allowlisted patterns (`myanimelist.net/anime/:id/...` or `myanimelist.net/manga/:id/...`).
-2. The ID and media type are extracted from the URL.
-3. The backend then queries the verified Jikan endpoint (`https://api.jikan.moe/v4/anime/{id}/full` or `manga/{id}/full`).
-4. Any arbitrary URLs, non-MAL domains, or internal IP addresses (localhost, 127.0.0.1, 10.0.0.0/8, 169.254.0.0/16) are rejected at the schema validation boundary.
+### URL Safety Architecture & SSRF Defenses:
+To eliminate Server-Side Request Forgery (SSRF) vulnerabilities, the application **never** performs direct HTTP fetches of user-supplied URLs or passes user input to fetch handlers:
+1. **Strict WHATWG URL Parsing:**
+   - URLs are parsed using the standard WHATWG `URL` class (`apps/api/src/services/import/url-parser.ts`).
+   - Rejects non-HTTPS protocols (`http:`, `ftp:`, `file:`, `javascript:`, etc.).
+   - Exact hostname validation: Hostname must be strictly `myanimelist.net`. Alternate domains, lookalikes (`myanlmelist.net`, `myanimelist.net.evil.com`), IP addresses (`127.0.0.1`, `169.254.169.254`, IPv6 `::1`), and localhost are rejected with HTTP 400.
+   - Enforces default port 443 (or empty port); rejects URLs with custom ports (`:8080`, `:22`).
+   - Rejects URLs containing authentication credentials (`user:pass@...`).
+   - Pathname validation: Must strictly match `^\/(anime|manga)\/(\d+)(?:\/[^\/]+)?\/?$`. Only positive numeric IDs are accepted.
+   - Trailing slashes are permitted, optional title slugs are safely parsed, and query parameters (`?query=...`) and hash fragments (`#fragment`) are safely discarded without altering the parsed ID or media type.
+2. **Fixed Upstream Base URL Construction:**
+   - Outbound HTTP requests are built strictly from the immutable constant `https://api.jikan.moe/v4/{endpoint}`.
+   - Client-supplied URLs are never passed to the HTTP client.
+   - Client redirect policy: `redirect: 'error'` ensures the HTTP client refuses to follow automatic redirects to arbitrary hosts.
 
-### Import Resilience:
-- **Timeout:** Bounded HTTP requests (8–12 seconds).
-- **Rate Limit Handling:** Jikan allows ~3 req/sec; backend throttles requests and handles HTTP 429 with exponential backoff.
-- **Cache:** In-memory or Redis-compatible cache for repeated search and detail queries.
-- **Manual Fallback:** If Jikan is offline or unreachable, the user is presented with a non-blocking notification and given the option to continue with manual entry using any entered titles.
+### Import Resilience & Upstream Protection:
+- **Timeouts:** Configurable request timeout with 10-second default using `AbortSignal.timeout(10000)`.
+- **Request Throttler:** `RequestThrottler` enforces a serialized inter-request delay (~334ms spacing, ~3 req/s) to comply with Jikan's published rate limits.
+- **Bounded In-Memory Caching:** `BoundedTtlCache` stores successful candidate search and full detail responses (10m TTL default) with LRU capacity eviction (500 entries max) to prevent unbounded memory growth. Failed requests are never cached as successes.
+- **Transient Error Retries:** Bounded exponential backoff (initial delay 500ms, backoff factor 2, max 3 retries, capped at 10s wait) applies exclusively to transient HTTP 429 (Too Many Requests) and HTTP 503 (Service Unavailable).
+- **`Retry-After` Header:** Honors standard numeric seconds and HTTP-date formats up to the maximum bounded wait time.
+- **Non-Retryable Errors:** Client errors (400, 404, etc.) fail immediately without retries.
+- **Decoupled Architecture:** If Jikan is unavailable, manual title creation, collection management, and bookmark tracking remain completely operational without interruption.
+
+### Normalization & Atomic Commit:
+- **Manga vs. Manhwa:** Automatically sets `mediaType: "manhwa"` when source `type` explicitly equals `"Manhwa"`. For ambiguous manga entries, flags `needsMediaConfirmation: true` and includes a warning requiring the user to verify the classification before saving.
+- **Community Review Exclusion:** Community reviews are never retrieved or stored.
+- **Server-Enforced Field Selection:** The client can preview and select fields (`selectedFields`), but the server revalidates and enforces which fields are written to the database. Unselected fields default to `null` or empty arrays.
+- **Transactional Persistence:** Persistence runs inside `db.transaction()`, atomically inserting title, aliases, genres, tags, external source link, initial bookmark, and collection memberships. Any failure triggers an automatic rollback. Duplicate MAL IDs for the same user return HTTP 409 `DUPLICATE_IMPORT` with the existing title ID.
 
 ---
 

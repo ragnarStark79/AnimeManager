@@ -229,4 +229,22 @@
   - Guarantees complete data privacy and isolation across tenants.
   - Prevents horizontal privilege escalation even if an attacker guesses valid resource UUIDs.
 
+---
+
+### ADR-016: Resilient Jikan v4 Importer with Zero-Trust SSRF Defense, Bounded Caching, and Atomic Commit
+
+- **Status:** Approved (Phase 03)
+- **Context:**
+  The application needs to import metadata from MyAnimeList via the community-hosted Jikan API v4. Allowing user-supplied URLs poses critical Server-Side Request Forgery (SSRF) risks (such as accessing AWS/GCP metadata endpoints `169.254.169.254`, container loopbacks, or private intranet services). Jikan also enforces rate limits (~3 req/s) and experiences transient HTTP 429/503 errors. Additionally, imported metadata must map to multiple relational tables (`titles`, `title_aliases`, `title_genres`, `title_tags`, `external_sources`, and optional `bookmarks` and `title_collections`) atomically, while preventing duplicate title records and honoring user field selections.
+- **Decision:**
+  1. **Zero-Trust URL & SSRF Defense:** Never pass user-supplied URLs to HTTP fetch. Parse URLs strictly using WHATWG `URL`, requiring `https:`, exact hostname `myanimelist.net`, default port 443, no user credentials, and matching path regex `^\/(anime|manga)\/(\d+)(?:\/[^\/]+)?\/?$`. Discard query strings and hash fragments. Construct outbound HTTP requests exclusively from the hardcoded base `https://api.jikan.moe/v4/{endpoint}`. Configure fetch with `redirect: 'error'` to prohibit open redirects.
+  2. **Upstream Resilience & Bounded Cache:** Implement a serialized `RequestThrottler` to enforce ~3 req/s inter-request spacing. Cache successful responses in `BoundedTtlCache` with 10-minute TTL and 500-entry LRU capacity eviction. Apply bounded exponential backoff (max 3 retries, max delay 10s) with `Retry-After` header parsing strictly to HTTP 429 and 503 responses. Fail immediately on 4xx client errors. Ensure manual title creation is decoupled and operational when Jikan is down.
+  3. **Strict Metadata Normalization:** Exclude community reviews entirely. Classify titles as `manhwa` only when upstream metadata explicitly confirms it; flag ambiguous manga titles with `needsMediaConfirmation: true` and an editorial warning.
+  4. **Server-Enforced Field Selection & Atomic Commit:** Client drafts are treated as untrusted. The server persists only fields explicitly selected in `selectedFields` or provided in `overrides`. All table inserts occur in a single `db.transaction()`. Duplicate MAL IDs for the same user are detected against `external_sources` and return HTTP 409 `DUPLICATE_IMPORT` with the existing title ID, creating no duplicate records.
+- **Consequences:**
+  - Total elimination of SSRF attack surfaces.
+  - Graceful tolerance of upstream rate limits and transient outages without blocking user catalog management.
+  - Atomic database transactions ensure zero partial or corrupted title records.
+  - Editorial integrity preserved through user preview and server-side field selection enforcement.
+
 

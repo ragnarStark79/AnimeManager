@@ -54,3 +54,34 @@ export class DatabaseError extends AppError {
     super(message, 500, 'DATABASE_ERROR', details);
   }
 }
+
+export class ExternalProviderUnavailableError extends AppError {
+  constructor(message = 'External metadata provider is temporarily unavailable', details?: unknown[]) {
+    super(message, 502, 'EXTERNAL_PROVIDER_UNAVAILABLE', details);
+  }
+}
+
+export class ExternalProviderTimeoutError extends AppError {
+  constructor(message = 'External metadata provider request timed out', details?: unknown[]) {
+    super(message, 504, 'EXTERNAL_PROVIDER_TIMEOUT', details);
+  }
+}
+
+export class ExternalProviderRateLimitError extends AppError {
+  constructor(message = 'External metadata provider rate limit exceeded', details?: unknown[]) {
+    super(message, 429, 'RATE_LIMITED', details);
+  }
+}
+
+export class ExternalResourceNotFoundError extends AppError {
+  constructor(message = 'External metadata resource not found', details?: unknown[]) {
+    super(message, 404, 'EXTERNAL_RESOURCE_NOT_FOUND', details);
+  }
+}
+
+export class DuplicateImportError extends AppError {
+  constructor(message = 'This title has already been imported from the external provider', details?: unknown[]) {
+    super(message, 409, 'DUPLICATE_IMPORT', details);
+  }
+}
+

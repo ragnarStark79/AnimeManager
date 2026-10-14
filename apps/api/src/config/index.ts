@@ -9,6 +9,13 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   COVER_MAX_BYTES: z.coerce.number().int().positive().default(5242880),
+  JIKAN_BASE_URL: z.string().url().default('https://api.jikan.moe/v4'),
+  REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  IMPORT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
+  IMPORT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  JIKAN_CACHE_TTL_MS: z.coerce.number().int().positive().default(300000),
+  JIKAN_CACHE_MAX_ENTRIES: z.coerce.number().int().positive().default(200),
+  JIKAN_MIN_REQUEST_INTERVAL_MS: z.coerce.number().int().positive().default(350),
 });
 
 function loadConfig() {

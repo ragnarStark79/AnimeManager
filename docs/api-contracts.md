@@ -1,9 +1,9 @@
 # AnimeManager — REST API Contracts
 
-**Document Version:** 1.1  
+**Document Version:** 1.2  
 **Base Path:** `/api/v1`  
-**Status:** Core APIs Implemented (Phase 02)  
-**Implementation State:** Health, Titles, Collections, and Bookmarks Implemented; Jikan Importer, Uploads, and Exports Pending (Phases 03 & 05)  
+**Status:** Core APIs & Jikan Importer Implemented (Phase 01, Phase 02, & Phase 03)  
+**Implementation State:** Health, Titles, Collections, Bookmarks, and Jikan Importer Implemented; Uploads and Exports Pending (Phase 05)  
 
 ---
 
@@ -65,15 +65,15 @@ All API responses use consistent JSON envelope structures.
 | 200 OK | - | Successful GET, PATCH, or PUT request. |
 | 201 Created | - | Resource successfully created. |
 | 204 No Content | - | Successful DELETE request. |
-| 400 Bad Request | `BAD_REQUEST`, `MALFORMED_INPUT` | Unparseable syntax or invalid parameters. |
+| 400 Bad Request | `BAD_REQUEST`, `MALFORMED_INPUT`, `CONFIRMATION_REQUIRED` | Unparseable syntax, invalid URL/ID params, or unconfirmed deletion. |
 | 401 Unauthorized | `UNAUTHORIZED` | Missing or invalid authentication token. |
 | 403 Forbidden | `FORBIDDEN` | Caller lacks permission for this resource. |
 | 404 Not Found | `NOT_FOUND` | Resource does not exist or is not owned by user. |
-| 409 Conflict | `CONFLICT`, `DUPLICATE_RESOURCE` | Resource already exists (e.g. duplicate collection name, duplicate external ID). |
+| 409 Conflict | `CONFLICT`, `DUPLICATE_RESOURCE`, `DUPLICATE_IMPORT` | Resource already exists (duplicate collection name, or duplicate imported external MAL ID). |
 | 422 Unprocessable | `VALIDATION_ERROR` | Schema validation error on payload. |
-| 429 Too Many Requests| `RATE_LIMITED` | Exceeded rate limit thresholds. |
-| 502 Bad Gateway | `EXTERNAL_PROVIDER_UNAVAILABLE`| Jikan API failed or unreachable. |
-| 504 Gateway Timeout | `EXTERNAL_PROVIDER_TIMEOUT` | Jikan API did not respond within timeout window. |
+| 429 Too Many Requests| `RATE_LIMITED` | Exceeded rate limit thresholds or upstream Jikan rate limit. |
+| 502 Bad Gateway | `EXTERNAL_PROVIDER_UNAVAILABLE`| Jikan API failed, returned 503, or is unreachable after retries. |
+| 504 Gateway Timeout | `EXTERNAL_PROVIDER_TIMEOUT` | Jikan API did not respond within request timeout window (10s). |
 | 500 Server Error | `INTERNAL_ERROR` | Unhandled error; details kept server-side. |
 
 ---
@@ -319,24 +319,78 @@ Convenience endpoint to upsert (create or update) the bookmark associated with a
 ## 6. Jikan Import & Metadata Normalization
 
 ### `GET /api/v1/import/jikan/search`
-Search MyAnimeList via Jikan API.
+Search MyAnimeList via the resilient server-side Jikan client.
 
+- **Authentication:** Required (`Bearer <JWT>`)
 - **Query Parameters:**
-  - `q` (string, required, min length 3)
-  - `type` (`anime` | `manga`, required)
-  - `page` (integer, default: 1)
+  - `q` (string, required, length 2–100 chars): Search keyword.
+  - `mediaType` (enum: `anime` | `manga`, required): Media catalog to query.
+  - `page` (integer, default: 1, min: 1, max: 100): Result page number.
+- **Upstream Handling:** Outbound request to `https://api.jikan.moe/v4/{anime|manga}?q={q}&page={page}&limit=20`. Inter-request throttling and 10-minute in-memory caching applied.
+- **Response 200 OK:**
+```json
+{
+  "data": [
+    {
+      "malId": 52991,
+      "url": "https://myanimelist.net/anime/52991/Sousou_no_Frieren",
+      "imageUrl": "https://cdn.myanimelist.net/images/anime/1015/138006l.jpg",
+      "englishTitle": "Frieren: Beyond Journey's End",
+      "originalTitle": "葬送のフリーレン",
+      "mediaType": "anime",
+      "sourceType": "TV",
+      "episodes": 28,
+      "chapters": null,
+      "volumes": null,
+      "score": 9.38,
+      "rank": 1,
+      "status": "Finished Airing",
+      "synopsis": "During their decade-long quest..."
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 1,
+    "totalPages": 1
+  },
+  "meta": {
+    "requestId": "req_import_search_1",
+    "timestamp": "2026-10-14T19:00:00Z"
+  }
+}
+```
+- **Error Responses:**
+  - `400 BAD_REQUEST`: Missing or invalid query parameters (e.g. `q` too short, invalid `mediaType`).
+  - `429 RATE_LIMITED`: Upstream rate limit encountered and retries exhausted.
+  - `502 EXTERNAL_PROVIDER_UNAVAILABLE`: Upstream Jikan failure or 503 unavailable.
+  - `504 EXTERNAL_PROVIDER_TIMEOUT`: Jikan did not respond within 10 seconds.
 
-- **Response 200 OK:** List of candidate search results with MAL ID, titles, image URLs, synopsis snippet, score, and publication details.
+---
 
 ### `GET /api/v1/import/preview`
-Parse a MyAnimeList URL or ID and return an editable normalized preview draft.
+Fetch full metadata for a MyAnimeList title by URL or numeric ID + mediaType, returning an editable normalized draft. Does **NOT** mutate the database.
 
-- **Query Parameters:**
-  - `url` (string, optional: e.g. `https://myanimelist.net/anime/52991/Sousou_no_Frieren`)
-  - `id` (integer, optional)
-  - `type` (`anime` | `manga`, optional if URL is provided)
-
-- **Safety:** Backend validates that the URL matches strict allowlist regex: `^https:\/\/myanimelist\.net\/(anime|manga)\/(\d+)`. Arbitrary hostnames return `400 BAD_REQUEST`.
+- **Authentication:** Required (`Bearer <JWT>`)
+- **Query Parameters (one of two forms required):**
+  - Form 1 (URL):
+    - `url` (string, required): Supported forms:
+      - `https://myanimelist.net/anime/{id}`
+      - `https://myanimelist.net/manga/{id}`
+      - With optional slug: `https://myanimelist.net/anime/{id}/Sousou_no_Frieren`
+  - Form 2 (ID + mediaType):
+    - `id` (integer, positive): MAL ID.
+    - `mediaType` (enum: `anime` | `manga`).
+- **Security & SSRF Safeguards:**
+  - Parsed via strict URL parser. Hostname must be strictly `myanimelist.net`. Protocol must be `https:`. No user/password, default port only.
+  - Outbound requests construct URLs exclusively from fixed base `https://api.jikan.moe/v4/{mediaType}/{id}/full`.
+  - Client-supplied URLs are **never** passed to HTTP fetch. Automatic redirects are disabled (`redirect: 'error'`).
+- **Duplicate Detection:**
+  - Checks if `external_sources` already has a record for `(provider = 'myanimelist', external_id = malId)` belonging to the authenticated user.
+  - If found, `duplicateExistingTitleId` contains the existing title UUID; otherwise `null`.
+- **Manga vs. Manhwa Disambiguation:**
+  - If upstream type is explicitly `"Manhwa"`, sets `mediaType: "manhwa"`.
+  - If ambiguous manga type, includes `warnings: ["Source classified as manga..."]` and sets `needsMediaConfirmation: true`.
 - **Response 200 OK:**
 ```json
 {
@@ -348,53 +402,162 @@ Parse a MyAnimeList URL or ID and return an editable normalized preview draft.
     "englishTitle": "Frieren: Beyond Journey's End",
     "originalTitle": "葬送のフリーレン",
     "aliases": [
-      { "title": "Sousou no Frieren", "languageCode": "ja", "type": "romanized" }
+      { "title": "Sousou no Frieren", "aliasType": "romanized", "languageCode": "ja" }
     ],
     "synopsis": "During their decade-long quest...",
-    "background": "Sousou no Frieren was released on Blu-ray...",
+    "background": "Based on the manga...",
     "coverUrl": "https://cdn.myanimelist.net/images/anime/1015/138006l.jpg",
     "releaseYear": 2023,
     "publicationStatus": "Finished Airing",
+    "startDate": "2023-09-29",
+    "endDate": "2024-03-22",
     "episodeCount": 28,
     "chapterCount": null,
     "sourceScore": 9.38,
     "sourceRank": 1,
     "sourcePopularity": 234,
     "genres": ["Adventure", "Drama", "Fantasy"],
-    "studios": ["Madhouse"],
-    "sourceRetrievedAt": "2026-10-14T14:50:00Z",
+    "tags": ["Elves", "Magic"],
     "warnings": [],
-    "duplicateExistingTitleId": null
+    "needsMediaConfirmation": false,
+    "duplicateExistingTitleId": null,
+    "sourceRetrievedAt": "2026-10-14T19:00:00Z"
   },
-  "meta": { "requestId": "req_preview_1" }
+  "meta": {
+    "requestId": "req_preview_1",
+    "timestamp": "2026-10-14T19:00:00Z"
+  }
 }
 ```
 
-### `POST /api/v1/import/commit`
-Accept user-reviewed and edited metadata fields to create local Title and external source mappings.
+---
 
-- **Request Body:**
+### `POST /api/v1/import/commit`
+Atomically commit a user-reviewed import draft into local PostgreSQL tables (`titles`, `title_aliases`, `title_genres`, `title_tags`, `external_sources`, and optionally `bookmarks` and `title_collections`).
+
+- **Authentication:** Required (`Bearer <JWT>`)
+- **Server-Side Enforcement Rules:**
+  - **Field Selection:** Only fields marked `true` in `selectedFields` (or explicitly provided in `overrides`) are persisted. Unselected fields default to `null` or empty arrays. Client drafts cannot force unselected fields into the database.
+  - **Owner Scoping:** The `owner_id` is derived strictly from the verified JWT.
+  - **Duplicate Prevention:** If `external_sources` already has `(myanimelist, externalId)` for this user, returns `409 DUPLICATE_IMPORT` with the existing title ID without creating any new record.
+  - **Atomicity:** All table inserts occur in a single `db.transaction()`. If any step fails (e.g. invalid collection ID), the entire transaction rolls back.
+  - **Review Exclusion:** Community reviews are completely absent from draft schemas and cannot be persisted.
+- **Request Body (`ImportCommitInput`):**
 ```json
 {
-  "draft": { ... },
+  "draft": {
+    "provider": "myanimelist",
+    "externalId": "52991",
+    "sourceUrl": "https://myanimelist.net/anime/52991/Sousou_no_Frieren",
+    "mediaType": "anime",
+    "englishTitle": "Frieren: Beyond Journey's End",
+    "originalTitle": "葬送のフリーレン",
+    "aliases": [
+      { "title": "Sousou no Frieren", "aliasType": "romanized", "languageCode": "ja" }
+    ],
+    "synopsis": "During their decade-long quest...",
+    "background": "Based on manga.",
+    "coverUrl": "https://cdn.myanimelist.net/images/anime/1015/138006l.jpg",
+    "releaseYear": 2023,
+    "publicationStatus": "Finished Airing",
+    "startDate": "2023-09-29",
+    "endDate": "2024-03-22",
+    "episodeCount": 28,
+    "chapterCount": null,
+    "sourceScore": 9.38,
+    "sourceRank": 1,
+    "sourcePopularity": 234,
+    "genres": ["Adventure", "Drama", "Fantasy"],
+    "tags": ["Elves", "Magic"],
+    "sourceRetrievedAt": "2026-10-14T19:00:00Z"
+  },
   "selectedFields": {
     "englishTitle": true,
     "originalTitle": true,
     "synopsis": true,
     "background": false,
     "coverUrl": true,
-    "genres": true
+    "genres": true,
+    "tags": true,
+    "aliases": true,
+    "dates": true,
+    "counts": true,
+    "sourceMetrics": true
   },
   "overrides": {
-    "englishTitle": "Frieren: Beyond Journey's End"
+    "englishTitle": "Frieren: Beyond Journey's End (Custom)"
   },
+  "confirmedMediaType": "anime",
   "initialBookmark": {
-    "status": "plan_to_consume"
+    "status": "plan_to_consume",
+    "priority": 4
   },
   "collectionIds": ["c1a9c148-1122-4a5c-9c3a-86714db254cb"]
 }
 ```
-- **Response 201 Created:** Saved Title object with ID.
+- **Response 201 Created:** Full created Title object with attached relationships.
+```json
+{
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "ownerId": "00000000-0000-0000-0000-000000000001",
+    "mediaType": "anime",
+    "englishTitle": "Frieren: Beyond Journey's End (Custom)",
+    "originalTitle": "葬送のフリーレン",
+    "synopsis": "During their decade-long quest...",
+    "background": null,
+    "coverUrl": "https://cdn.myanimelist.net/images/anime/1015/138006l.jpg",
+    "coverSourceType": "provider",
+    "releaseYear": 2023,
+    "publicationStatus": "Finished Airing",
+    "startDate": "2023-09-29",
+    "endDate": "2024-03-22",
+    "episodeCount": 28,
+    "chapterCount": null,
+    "sourceScore": 9.38,
+    "sourceRank": 1,
+    "sourcePopularity": 234,
+    "aliases": [ ... ],
+    "genres": ["Adventure", "Drama", "Fantasy"],
+    "tags": ["Elves", "Magic"],
+    "externalSources": [
+      {
+        "provider": "myanimelist",
+        "externalId": "52991",
+        "sourceUrl": "https://myanimelist.net/anime/52991/Sousou_no_Frieren"
+      }
+    ],
+    "bookmark": {
+      "status": "plan_to_consume",
+      "progress": 0,
+      "priority": 4
+    },
+    "createdAt": "2026-10-14T19:05:00Z",
+    "updatedAt": "2026-10-14T19:05:00Z"
+  },
+  "meta": {
+    "requestId": "req_commit_1",
+    "timestamp": "2026-10-14T19:05:00Z"
+  }
+}
+```
+- **Response 409 Conflict (`DUPLICATE_IMPORT`):**
+```json
+{
+  "error": {
+    "code": "DUPLICATE_IMPORT",
+    "message": "Title from myanimelist with ID 52991 already exists in your library.",
+    "details": {
+      "existingTitleId": "550e8400-e29b-41d4-a716-446655440000",
+      "provider": "myanimelist",
+      "externalId": "52991"
+    }
+  },
+  "meta": {
+    "requestId": "req_commit_dup_1"
+  }
+}
+```
 
 ---
 

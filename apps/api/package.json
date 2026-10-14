@@ -8,7 +8,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "node -e \"console.log('@animemanager/api: lint passed cleanly')\"",
-    "test": "node --test test/**/*.test.js",
+    "test": "node --test --test-concurrency=1 test/**/*.test.js",
     "start": "node dist/server.js"
   },
   "dependencies": {

@@ -13,13 +13,14 @@
    - **Impact:** Upstream changes to MyAnimeList HTML structures, Cloudflare challenge modifications, or Jikan hosting downtime can cause temporary import failures.
    - **Mitigation:** The application treats Jikan as an enhancement, never a hard dependency. Manual title entry and editing are fully functional without external network access.
 
-2. **Rate Limits & Throttling:**
+2. **Rate Limits & In-Memory Cache Characteristics:**
    - Jikan enforces rate limits (~3 requests/second, ~60 requests/minute). Exceeding this triggers HTTP 429 Too Many Requests.
-   - **Mitigation:** The backend Jikan adapter implements request throttling, exponential backoff for transient errors, and response caching for search and detail queries.
+   - **Mitigation & Characteristics:** The backend Jikan adapter implements an in-memory `RequestThrottler` (~334ms spacing), bounded exponential backoff with `Retry-After` header parsing, and a `BoundedTtlCache` (10m TTL, 500 entry LRU cap). The cache is process-local; it resets if the server restarts. Failed requests are never cached as successes.
+   - **Limitation:** In multi-instance or serverless environments, an in-memory cache is not shared across instances. For a single-instance container or personal server, this is completely sufficient and avoids external Redis dependencies.
 
-3. **Manga vs. Manhwa Classification:**
+3. **Manga vs. Manhwa Classification Boundaries:**
    - MyAnimeList catalogs Japanese manga, Korean manhwa, and Chinese manhua under a single `/manga/` taxonomy.
-   - **Mitigation:** The import normalizer inspects the publication type and country of origin to detect manhwa, but prompts the user in the interactive preview draft if classification is ambiguous.
+   - **Mitigation:** The import normalizer inspects the publication type. If the type is explicitly `"Manhwa"`, it preselects `manhwa`. If ambiguous, it flags `needsMediaConfirmation: true` and includes a warning requiring the user to explicitly select `manga` or `manhwa` before commit.
 
 ---
 
@@ -66,7 +67,9 @@
    - When the backend connects via a privileged PostgreSQL connection (or Supabase service role), PostgreSQL table-level RLS policies are bypassed by the privileged role.
    - **Mitigation & Enforcement:** Backend service-layer authorization is strictly mandatory. All database queries in the repository layer enforce `owner_id = $x` in both reads and writes. Cross-owner references (e.g. attaching a title belonging to another user to one's own collection or bookmark) are blocked by explicit ownership validation queries before writes occur. In automated integration tests, attempts by Owner B to access or manipulate Owner A's records return 404 or 403.
 
-2. **Phase 02 Scope Boundaries:**
-   - The Jikan external metadata import endpoints (`/api/v1/import/*`), file upload handlers for custom covers (`/api/v1/uploads/covers`), and backup streaming export (`/api/v1/export/*`) are intentionally not implemented in Phase 02, adhering strictly to the phase boundaries. They are scheduled for Phase 03 and Phase 05 respectively.
+2. **Phase 03 Scope Boundaries:**
+   - The Jikan external metadata import endpoints (`/api/v1/import/jikan/search`, `/api/v1/import/preview`, `/api/v1/import/commit`) are fully implemented and verified in Phase 03.
+   - File upload handlers for custom covers (`/api/v1/uploads/covers`) and backup streaming exports (`/api/v1/export/*`) remain deferred to Phase 05.
+   - React frontend UI components, Vite setup, and glassmorphism styling are strictly deferred to Phase 04 and Phase 05.
 
 

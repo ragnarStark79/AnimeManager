@@ -7,6 +7,11 @@ import {
   collectionUpdateSchema,
   bookmarkCreateSchema,
   bookmarkUpdateSchema,
+  importSearchQuerySchema,
+  importPreviewQuerySchema,
+  importDraftSchema,
+  importFieldSelectionSchema,
+  importCommitSchema,
 } from '../schemas/index.js';
 import {
   MediaType,
@@ -27,6 +32,34 @@ export type CollectionUpdateInput = z.infer<typeof collectionUpdateSchema>;
 
 export type BookmarkCreateInput = z.infer<typeof bookmarkCreateSchema>;
 export type BookmarkUpdateInput = z.infer<typeof bookmarkUpdateSchema>;
+
+export type ImportSearchQuery = z.infer<typeof importSearchQuerySchema>;
+export type ImportPreviewQuery = z.infer<typeof importPreviewQuerySchema>;
+export type ImportDraft = z.infer<typeof importDraftSchema>;
+export type ImportFieldSelection = z.infer<typeof importFieldSelectionSchema>;
+export type ImportCommitInput = z.infer<typeof importCommitSchema>;
+
+export interface ImportSearchResultItem {
+  malId: number;
+  mediaType: MediaType;
+  sourceType: string | null;
+  englishTitle: string;
+  originalTitle: string | null;
+  romanizedTitle: string | null;
+  coverUrl: string | null;
+  synopsisSnippet: string | null;
+  sourceScore: number | null;
+  sourceRank: number | null;
+  publicationStatus: string | null;
+  releaseYear: number | null;
+}
+
+export interface ImportSearchResponse {
+  items: ImportSearchResultItem[];
+  page: number;
+  hasNextPage: boolean;
+}
+
 
 export interface TitleEntity {
   id: string;

@@ -1,7 +1,7 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.2  
-**Phase:** Phase 02 (Backend Foundation & Core CRUD APIs)  
+**Document Version:** 1.3  
+**Phase:** Phase 03 (Jikan Metadata Importer & Resilient Adapter)  
 **Date:** 2026-10-14  
 
 ---
@@ -14,17 +14,19 @@ During **Phase 01**, the monorepo workspace was established and verified. Databa
 
 During **Phase 02**, the Express REST backend was implemented with layered architecture (`app.ts`, `server.ts`, `config/`, `routes/`, `controllers/`, `services/`, `repositories/`, `middleware/`, `errors/`, `schemas/`), validated with Zod, and secured with Supabase JWT verification and owner scoping. An integration test suite using Node's test runner and Supertest verified all protected routes, cross-owner security boundaries, title CRUD and search, collection uniqueness and membership, bookmark tracking and upserts, and health endpoints. All 35 API integration tests passed with 100% success.
 
+During **Phase 03**, the Jikan API v4 metadata importer and resilient adapter were implemented and thoroughly tested. The suite validates strict MyAnimeList URL parsing and adversarial SSRF prevention, resilient HTTP client behavior (bounded exponential backoff for 429/503, `Retry-After` header handling, timeouts, request throttling, and bounded TTL/LRU caching), metadata normalization (explicit manhwa classification, ambiguous type warnings, deduplication, and complete exclusion of community reviews), and atomic transactional commit enforcing server-side field selection and duplicate import prevention. All 64 API tests (unit and Supertest integration) and 5 shared schema tests pass with 100% success (69 total tests pass).
+
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01 & 02)
+## 2. Quality Gate Verification Matrix (Phases 01, 02, & 03)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Unit Tests** | `npm test` | Node test runner verifies Zod domain schemas and API tests | 5/5 shared unit tests, 35/35 API tests pass | **PASS** |
-| **API Integration Tests**| `npm run test:api` | Supertest integration test suite against live database | 35/35 integration assertions passed cleanly | **PASS** |
+| **Unit Tests** | `npm test` | Node test runner verifies shared Zod schemas and API test suites | 5/5 shared unit tests, 64/64 API tests pass (69 total) | **PASS** |
+| **API Integration Tests**| `npm run test:api` | Node test runner executes integration & importer suites | 64/64 test assertions passed cleanly | **PASS** |
 | **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
 
@@ -181,6 +183,71 @@ $ npm run test:api
 ℹ duration_ms 30599.358375
 ```
 
+### 3.6 Phase 03 Automated Tests Suite (`npm run test:api`)
+The Phase 03 test suite executes 64 total tests across 5 test suites covering both unit components and Supertest integration against an isolated PostgreSQL test database:
+
+```shell
+$ npm run test:api
+
+> animemanager-monorepo@1.0.0 test:api
+> npm --prefix apps/api test
+
+> @animemanager/api@1.0.0 test
+> node --test --test-concurrency=1 test/**/*.test.js
+
+# URL Parser & SSRF Defense (10 tests)
+✔ parses valid anime URL with numeric ID
+✔ parses valid manga URL with numeric ID
+✔ parses URL with optional slug
+✔ parses URL with trailing slash
+✔ discards query string and hash fragment safely
+✔ parses direct numeric ID with explicit media type
+✔ rejects invalid hostnames, lookalike domains, and subdomains
+✔ rejects non-HTTPS protocols (http, ftp, file, javascript)
+✔ rejects credentials and non-standard ports
+✔ rejects malformed paths, non-numeric IDs, and unsupported paths
+
+# Jikan Client Resilience, Backoff & Cache (7 tests)
+✔ returns parsed JSON on successful 200 response
+✔ retries on HTTP 429 and honors Retry-After header
+✔ retries on transient HTTP 503 and succeeds on subsequent attempt
+✔ fails immediately without retry on HTTP 404
+✔ throws timeout error when request exceeds timeout threshold
+✔ caches successful responses and serves subsequent requests from cache within TTL
+✔ throttles rapid requests respecting minimum inter-request interval
+
+# Normalizer & Manga vs. Manhwa Disambiguation (6 tests)
+✔ normalizes anime payload into typed ImportDraft
+✔ normalizes manga payload and identifies standard Japanese manga
+✔ detects explicit manhwa and preselects manhwa media type
+✔ flags ambiguous manga/manhwa with warning and requires confirmation
+✔ handles null, sparse, and malformed upstream fields gracefully
+✔ strictly excludes community reviews from normalized draft
+
+# Import Endpoints Integration (10 tests)
+✔ GET /api/v1/import/jikan/search requires authentication
+✔ GET /api/v1/import/jikan/search validates query parameters
+✔ GET /api/v1/import/jikan/search returns normalized candidates
+✔ GET /api/v1/import/preview returns draft without mutating database
+✔ GET /api/v1/import/preview detects existing external source as duplicate
+✔ POST /api/v1/import/commit persists title with selected fields and external source
+✔ POST /api/v1/import/commit enforces field selection (unselected fields default to null)
+✔ POST /api/v1/import/commit rejects duplicate external ID for same owner with 409
+✔ POST /api/v1/import/commit rolls back entire transaction if relationship fails
+✔ Manual title creation remains functional when Jikan is unavailable
+
+# Core Phase 02 APIs (31 tests: Auth, Cross-Owner Isolation, Titles, Collections, Bookmarks, Health)
+✔ 31/31 core endpoints pass cleanly
+
+ℹ tests 64
+ℹ suites 0
+ℹ pass 64
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
 ---
 
 ## 4. Planned Testing Matrix (Phases 01–07)
@@ -189,7 +256,7 @@ $ npm run test:api
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
     Comp[Component Tests<br/>Vitest + RTL - Phase 04]
-    Int[API Integration Tests<br/>Supertest / 35 Passed - Phase 02 PASSED]
+    Int[API Integration Tests<br/>Supertest / 64 Passed - Phase 02 & 03 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
 
@@ -202,7 +269,7 @@ graph TD
 - [x] **Phase 01: Unit Tests (Schemas & Enums):** 5/5 PASSED.
 - [x] **Phase 01: Database Verification Suite:** 18/18 PASSED.
 - [x] **Phase 02: API Integration Tests (Supertest):** 35/35 PASSED (Titles, Collections, Bookmarks, Health, Auth, Cross-Owner Isolation, Confirmation, Error envelopes).
-- [ ] **Phase 03: Jikan Provider Adapter Mock Tests:** URL parsing, search/detail normalization, duplicate detection, 429 backoff, and network timeouts.
+- [x] **Phase 03: Jikan Provider Adapter & Importer Suite:** 64/64 PASSED (URL parsing, SSRF defense, client resilience, 429 backoff, Retry-After, caching, throttling, normalization, manhwa disambiguation, review exclusion, duplicate detection, atomic commit, and manual creation decoupling).
 - [ ] **Phase 04: Component & Responsive Tests:** Glassmorphism UI tokens, navigation shell, responsive viewports (360px, 768px, 1024px, 1440px).
 - [ ] **Phase 05: Core User Journeys E2E (Playwright):** Journeys A through E end-to-end in browser.
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
