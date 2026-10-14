@@ -1,0 +1,65 @@
+ANTIGRAVITY MASTER BUILD PROMPT Project: Personal Media Library
+
+You are building a complete, running personal website for cataloging
+anime, manga, and manhwa. The attached file
+“Personal_Media_Library_Full_Technical_Specification.docx” is the source
+of truth. Read it fully before implementation.
+
+NON-NEGOTIABLE PRODUCT REQUIREMENTS - Primary navigation: My List and
+Bookmarks. - My List means user-created collections/folders; one title
+can belong to many collections. - Bookmarks means tracking
+status/progress; it is independent of collection membership. - Media
+types: anime, manga, manhwa. - Add titles manually or import available
+MyAnimeList metadata via Jikan. - Import flow must preview and allow
+editing/selecting fields before saving. - Support English title,
+original title, alternate titles, synopsis, background, cover URL or
+upload, genres, tags, external IDs, source score/rank, and applicable
+episode/chapter data. - Do not import reviews in v1. - Use Supabase
+PostgreSQL and Supabase Storage. Deploy frontend to Vercel; choose a
+compatible backend deployment model. - Use the supplied glassmorphism
+reference as visual direction: cool blue/gray blurred backdrop, frosted
+translucent surfaces, rounded cards, subtle borders, soft shadows,
+attractive cover grid, legible typography, responsive layout. - Keep the
+site private-first. Implement authentication/access controls suitable
+for public internet deployment. - Never expose service-role secrets in
+the browser. - Never fetch arbitrary user-provided URLs. Parse supported
+MAL URL patterns, then call known Jikan endpoints. - Jikan is external
+and can fail. Manual entry must always work. - Do not invent Jikan
+endpoints; verify current documentation. - Do not use fake hard-coded
+data as a substitute for working persistence.
+
+WORK METHOD 1. Inspect the repository and existing environment first. 2.
+Create a short implementation plan and record assumptions. 3. Build
+phase by phase, starting with repository/configuration and database
+schema. 4. Implement and test backend/database before connecting the
+frontend. 5. Then build the design system and frontend workflows. 6. Add
+Jikan import after local CRUD and authorization work. 7. Run unit,
+integration, component, and end-to-end tests. 8. Fix failures; never
+disable checks just to obtain a passing build. 9. Verify responsive
+behavior, accessibility, error/loading/empty states, export, security,
+and deployment. 10. Update README and docs after every phase.
+
+REQUIRED PHASE ORDER 0. Inspect/setup repo, package scripts, env
+example, docs and decisions. 1. Supabase migrations, schema,
+constraints, indexes, RLS/auth and database tests. 2. Express API
+foundation, validation, errors, auth, titles/collections/bookmarks CRUD
+and API tests. 3. Jikan adapter, MAL URL/ID parsing, search/detail
+normalization, preview/commit, duplicate handling, cache,
+timeout/rate-limit behavior and mocked tests. 4. React/Vite shell,
+glassmorphism design tokens, routes, shared components and responsive
+navigation. 5. Connect UI to real APIs; implement manual title forms,
+collections, bookmarks/progress, title detail, cover URL/upload,
+search/filter/sort, importer and export. 6.
+Security/accessibility/performance hardening and recovery checks. 7.
+Deploy, configure environment variables, run smoke tests, and document
+rollback.
+
+DEFINITION OF DONE A feature is complete only if UI, API, validation,
+persistence, authorization, errors, and tests work together. Maintain: -
+README.md - .env.example - docs/architecture.md -
+docs/api-contracts.md - docs/decisions.md - docs/test-report.md -
+docs/deployment.md - docs/known-limitations.md
+
+Start by reading the full specification, then report the repository
+state and the exact plan for Phase 0/Phase 1. Do not try to generate the
+entire website in one unreviewed pass.

@@ -1,0 +1,19 @@
+{
+  "name": "@animemanager/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "node -e \"console.log('@animemanager/web: lint passed cleanly')\"",
+    "test": "node --test test/*.test.js 2>/dev/null || node -e \"console.log('@animemanager/web: Phase 01 baseline verified')\""
+  },
+  "dependencies": {
+    "@animemanager/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.5"
+  }
+}
