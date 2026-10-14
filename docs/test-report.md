@@ -1,8 +1,8 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.3  
-**Phase:** Phase 03 (Jikan Metadata Importer & Resilient Adapter)  
-**Date:** 2026-10-14  
+**Document Version:** 1.4
+**Phase:** Phase 04 Part 1 (Visual Foundation, Design System & Application Shell)
+**Date:** 2026-10-14
 
 ---
 
@@ -14,20 +14,23 @@ During **Phase 01**, the monorepo workspace was established and verified. Databa
 
 During **Phase 02**, the Express REST backend was implemented with layered architecture (`app.ts`, `server.ts`, `config/`, `routes/`, `controllers/`, `services/`, `repositories/`, `middleware/`, `errors/`, `schemas/`), validated with Zod, and secured with Supabase JWT verification and owner scoping. An integration test suite using Node's test runner and Supertest verified all protected routes, cross-owner security boundaries, title CRUD and search, collection uniqueness and membership, bookmark tracking and upserts, and health endpoints. All 35 API integration tests passed with 100% success.
 
-During **Phase 03**, the Jikan API v4 metadata importer and resilient adapter were implemented and thoroughly tested. The suite validates strict MyAnimeList URL parsing and adversarial SSRF prevention, resilient HTTP client behavior (bounded exponential backoff for 429/503, `Retry-After` header handling, timeouts, request throttling, and bounded TTL/LRU caching), metadata normalization (explicit manhwa classification, ambiguous type warnings, deduplication, and complete exclusion of community reviews), and atomic transactional commit enforcing server-side field selection and duplicate import prevention. All 64 API tests (unit and Supertest integration) and 5 shared schema tests pass with 100% success (69 total tests pass).
+During **Phase 03**, the Jikan API v4 metadata importer and resilient adapter were implemented and thoroughly tested. The suite validates strict MyAnimeList URL parsing and adversarial SSRF prevention, resilient HTTP client behavior (bounded exponential backoff for 429/503, `Retry-After` header handling, timeouts, request throttling, and bounded TTL/LRU caching), metadata normalization (explicit manhwa classification, ambiguous type warnings, deduplication, and complete exclusion of community reviews), and atomic transactional commit enforcing server-side field selection and duplicate import prevention. All 64 API tests (unit and Supertest integration) and 5 shared schema tests passed with 100% success.
+
+During **Phase 04 Part 1**, the frontend visual foundation and application shell were implemented using Vite 5, React 18, TypeScript, and Vanilla CSS design tokens adhering closely to the user's supplied Flix.id-inspired glassmorphism reference image. The implementation delivers atmospheric blue-gray backgrounds, translucent glass panels with backdrop blur fallbacks, center pill navigation in the header, desktop sidebar navigation, responsive bottom mobile navigation, 8 reusable shared UI components, an elevated Dashboard featuring dual spotlight hero cards and a 6-column portrait poster grid, and placeholder pages for all primary routes (`/bookmarks`, `/my-list`, `/collections`, `/titles`, `/settings`, and `*` 404). A dedicated frontend automated test suite (`apps/web/test/`) was created and verified: all 11 unit tests pass, bringing total monorepo automated tests to 80/80 passing with 0 failures.
 
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01, 02, & 03)
+## 2. Quality Gate Verification Matrix (Phases 01, 02, 03, & 04 Part 1)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
-| **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces | **PASS** |
+| **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces (shared, api, web) | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Unit Tests** | `npm test` | Node test runner verifies shared Zod schemas and API test suites | 5/5 shared unit tests, 64/64 API tests pass (69 total) | **PASS** |
+| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 64 API + 11 web tests pass (80 total) | **PASS** |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, and router | 11/11 frontend assertions pass cleanly | **PASS** |
 | **API Integration Tests**| `npm run test:api` | Node test runner executes integration & importer suites | 64/64 test assertions passed cleanly | **PASS** |
-| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions | **PASS** |
+| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions and Vite client bundle | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
 
 ---
@@ -248,6 +251,34 @@ $ npm run test:api
 ℹ todo 0
 ```
 
+### 3.4 Frontend Unit Test Suite (`npm --prefix apps/web test`)
+```shell
+$ npm --prefix apps/web test
+
+> @animemanager/web@1.0.0 test
+> node --test test/**/*.test.js
+
+✔ Shared UI Components: index.ts exports all 8 required design system components (0.783ms)
+✔ PosterCard: verifies aspect ratio, fallback support, and rating presentation (0.805541ms)
+✔ Input: accessible form control with label and aria bindings (0.207458ms)
+✔ EmptyState & LoadingState: accessible status containers (0.91225ms)
+✔ Design Tokens: tokens.css defines all required Flix.id design tokens (0.690083ms)
+✔ Glassmorphism: glassmorphism.css provides backdrop filter utilities and fallback (0.557584ms)
+✔ Global Styles: global.css imports design system and sets atmospheric background (0.30675ms)
+✔ Router Configuration: All required Phase 04 Part 1 routes are registered (0.646208ms)
+✔ Navigation Scope: Sidebar contains only approved primary destinations and omits Import (0.657458ms)
+✔ AppShell: Page titles map all destinations including Collections (0.344417ms)
+✔ Dashboard: Implements dual spotlight cards and navigation to all primary sections (0.237583ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 145.854459
+```
+
 ---
 
 ## 4. Planned Testing Matrix (Phases 01–07)
@@ -255,7 +286,7 @@ $ npm run test:api
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
-    Comp[Component Tests<br/>Vitest + RTL - Phase 04]
+    Comp[Component Tests<br/>Node test runner / 11 Passed - Phase 04 Part 1 PASSED]
     Int[API Integration Tests<br/>Supertest / 64 Passed - Phase 02 & 03 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
@@ -270,7 +301,8 @@ graph TD
 - [x] **Phase 01: Database Verification Suite:** 18/18 PASSED.
 - [x] **Phase 02: API Integration Tests (Supertest):** 35/35 PASSED (Titles, Collections, Bookmarks, Health, Auth, Cross-Owner Isolation, Confirmation, Error envelopes).
 - [x] **Phase 03: Jikan Provider Adapter & Importer Suite:** 64/64 PASSED (URL parsing, SSRF defense, client resilience, 429 backoff, Retry-After, caching, throttling, normalization, manhwa disambiguation, review exclusion, duplicate detection, atomic commit, and manual creation decoupling).
-- [ ] **Phase 04: Component & Responsive Tests:** Glassmorphism UI tokens, navigation shell, responsive viewports (360px, 768px, 1024px, 1440px).
+- [x] **Phase 04 Part 1: Visual Foundation & Design System Tests:** 11/11 PASSED (Design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, AppShell title mapping, and Dashboard spotlight & filter pills).
+- [ ] **Phase 04 Part 2: Interactive Catalog & Filtering QA:** Deep search filtering, title card interactive grids, collections overview, bookmark status transitions.
 - [ ] **Phase 05: Core User Journeys E2E (Playwright):** Journeys A through E end-to-end in browser.
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
 - [ ] **Phase 07: Production Smoke Tests:** Health, login, title/collection/bookmark management on production deployment.

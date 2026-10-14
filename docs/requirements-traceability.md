@@ -12,7 +12,7 @@ This matrix links every non-negotiable requirement, functional requirement (FR),
 
 | ID | Requirement Statement | Target Phase | Implementation Component | Verification Method | Status |
 |---|---|---|---|---|---|
-| **NNR-01** | Primary navigation consists of **My List** and **Bookmarks**. | Phase 04 | `apps/web/src/components/layout/Navigation.tsx` | Visual QA, component tests | Planned |
+| **NNR-01** | Primary navigation consists of **My List** and **Bookmarks**. | Phase 04 | `apps/web/src/components/layout/Header.tsx`, `Sidebar.tsx`, `MobileNav.tsx` | Visual QA, automated component & route tests | Verified (Phase 04 Part 1) |
 | **NNR-02** | **My List** means user-created collections/folders; a title can belong to multiple collections. | Phase 01, 02, 05 | `collections`, `title_collections` DB tables & API endpoints | DB integration tests, API tests | Verified (Phase 01 & 02) |
 | **NNR-03** | **Bookmarks** means tracking status and progress; independent of collection membership. | Phase 01, 02, 05 | `bookmarks` DB table & API endpoints | DB integration tests, API tests | Verified (Phase 01 & 02) |
 | **NNR-04** | Explicit media types: `anime`, `manga`, and `manhwa`. | Phase 01, 02 | PostgreSQL enum/check constraint, Zod schemas | Unit & DB constraint tests | Verified (Phase 01 & 02) |
@@ -20,7 +20,7 @@ This matrix links every non-negotiable requirement, functional requirement (FR),
 | **NNR-06** | Support English, original, alternate titles, synopsis, background, cover, genres, tags, external IDs, source score/rank, episode/chapter counts. | Phase 01, 02, 05 | Schema DDL, API DTOs, Detail view | Schema validation & API tests | Verified (Phase 01, 02, & 03) |
 | **NNR-07** | **Do not import community reviews in v1.** | Phase 03 | Jikan adapter excludes review endpoints | Unit test inspecting payload | Verified (Phase 03) |
 | **NNR-08** | Use Supabase PostgreSQL and Supabase Storage (`covers` bucket). | Phase 01, 02, 07 | Supabase client, SQL migrations | Database & migration tests | Schema & Migrations Verified (Phase 01 & 02) |
-| **NNR-09** | Glassmorphism visual direction: cool blue/gray blurred backdrop, translucent surfaces, rounded cards, legible typography. | Phase 04 | `apps/web/src/styles/tokens.css`, UI components | Visual QA, responsive testing | Planned (Phase 04) |
+| **NNR-09** | Glassmorphism visual direction: cool blue/gray blurred backdrop, translucent surfaces, rounded cards, legible typography. | Phase 04 | `apps/web/src/styles/tokens.css`, `glassmorphism.css`, UI components | Automated design token tests, responsive audits | Verified (Phase 04 Part 1) |
 | **NNR-10** | Private-first deployment; access controls suitable for public internet; never expose service-role secrets to browser. | Phase 01, 02, 06 | Supabase Auth, RLS, Express auth middleware | Security audit, integration tests | RLS & Auth Verified (Phase 01 & 02) |
 | **NNR-11** | Never fetch arbitrary user-provided URLs (SSRF prevention). Parse supported MAL URL patterns, then call Jikan. | Phase 02, 03, 06 | URL parse regex validator, strict HTTP client | Unit test SSRF injection suite | Verified (Phase 03) |
 | **NNR-12** | Jikan is external and can fail. Manual entry must always work. | Phase 03, 05 | Non-blocking Jikan error handling, manual title route | Mocked API failure tests | Verified (Phase 02 & Phase 03 API) |

@@ -6,9 +6,9 @@
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
 - **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 03: Jikan Metadata Importer & Resilient Adapter**
-- **Phase 03 Status:** **COMPLETED** (Verified with 64 Automated Tests & Quality Gates)
-- **Next Phase:** **Phase 04: Frontend Foundation & Glassmorphism Design System** (Awaiting user authorization)
+- **Current Active Phase:** **Phase 04 — Part 1: Visual Foundation, Design System & Application Shell**
+- **Phase 04 Part 1 Status:** **COMPLETED** (Verified with 11 Frontend Unit Tests, 64 API Tests, 18 DB Assertions, and Production Build)
+- **Next Phase:** **Phase 04 — Part 2: Navigation & Catalog Components** (Awaiting user review and authorization)
 
 ---
 
@@ -20,7 +20,8 @@
 | **Phase 01** | Repository Foundation & Database Schema | **COMPLETED** | Monorepo scaffold initialized with npm workspaces; TypeScript base configs created; Supabase migrations (`000001_initial_schema.sql`, `000002_security_policies.sql`), triggers, RLS policies, seed fixtures, and test assertions verified against live PostgreSQL (18/18 assertions pass; 5/5 schema unit tests pass). |
 | **Phase 02** | Backend Foundation & Core CRUD APIs | **COMPLETED** | Express API initialized with TypeScript, Zod validation, structured error handling, request ID logging, security headers (Helmet/CORS), JWT authentication, and owner scoping; CRUD endpoints for titles, collections, memberships, and bookmarks implemented and verified with integration tests (35/35 integration tests pass; 18/18 database assertions pass). |
 | **Phase 03** | Jikan Metadata Importer & Resilient Adapter | **COMPLETED** | Resilient Jikan v4 client with bounded retries, Retry-After header, request throttler, bounded TTL/LRU cache; strict URL/SSRF parser; metadata normalizer with explicit/ambiguous manhwa disambiguation and review data exclusion; read-only preview with duplicate detection; atomic transactional commit enforcing field selection (64/64 tests pass). |
-| **Phase 04** | Frontend Foundation & Glassmorphism Design System | **NOT STARTED** | Vite + React + TypeScript shell configured; custom CSS design tokens, glassmorphism surface utilities, typography, responsive layout shell (desktop/mobile), route structure, and shared UI components established; verified responsive across viewports. |
+| **Phase 04 (Part 1)** | Visual Foundation, Design System & Application Shell | **COMPLETED** | Vite + React + TypeScript application configured; custom CSS design tokens (`tokens.css`), glassmorphism utilities (`glassmorphism.css`), animations, global styling, AppShell, Header with center pill navigation, Sidebar, MobileNav, 8 reusable UI components (`Button`, `Badge`, `Input`, `GlassCard`, `PosterCard`, `EmptyState`, `LoadingState`, `ErrorState`), Dashboard with dual spotlight cards & 6-poster grid, route placeholders for `/bookmarks`, `/my-list`, `/collections`, `/titles`, `/settings`, and `*` 404 page; 11/11 automated frontend tests pass. |
+| **Phase 04 (Part 2)** | Navigation, Filtering & Catalog Presentation | **NOT STARTED** | Deep search filtering, title card interactive grids, collections overview, bookmark status transitions, and advanced layout states. |
 | **Phase 05** | Product Workflows & End-to-End Integration | **NOT STARTED** | UI connected to backend APIs; manual title creation/editing, collection management, bookmark tracking with progress, cover upload/URL, search/filter/sort, import preview/commit, and JSON/CSV export operational. |
 | **Phase 06** | Hardening: Security, Accessibility, & Performance | **NOT STARTED** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. |
 | **Phase 07** | Deployment Preparation & Production Verification | **NOT STARTED** | Frontend deployed to Vercel; Express API deployed to compatible Node host; Supabase production instance configured with RLS and Storage policies; smoke tests pass; rollback plan verified. |
@@ -59,10 +60,18 @@
   - Mounted `/api/v1/import/jikan/search`, `/api/v1/import/preview`, and `/api/v1/import/commit`.
 - [x] API integration & unit test suite implemented across `apps/api/test/`:
   - 64/64 tests pass covering URL parser adversarial SSRF, resilient client retry/cache/throttling, metadata normalization, and Supertest endpoint integration.
+- [x] Phase 04 Part 1 Visual Foundation & Application Shell implemented in `apps/web`:
+  - Configured Vite 5 + React 18 + TypeScript with `@/` path alias and strict typechecking.
+  - Implemented tokenized CSS design system (`tokens.css`, `glassmorphism.css`, `animations.css`, `global.css`) matching user reference image.
+  - Implemented application shell (`AppShell.tsx`, `Header.tsx` with center pill navigation, `Sidebar.tsx`, `MobileNav.tsx`).
+  - Implemented 8 reusable UI components: `Button`, `Badge`, `Input`, `GlassCard`, `PosterCard`, `EmptyState`, `LoadingState`, `ErrorState`.
+  - Implemented Dashboard with dual spotlight cards (Anime & Manhwa), category filter pills, 6-column portrait poster grid, and navigation cards to Bookmarks, My List, and Collections.
+  - Implemented placeholder route pages: `/bookmarks`, `/my-list`, `/collections`, `/titles`, `/settings`, and `*` (NotFoundPage).
+  - Implemented automated frontend test suite in `apps/web/test/` (11/11 tests pass).
 - [x] Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:api`, `npm run test:db` all pass with zero errors.
 
-### Work Not Yet Started (Phases 04–07)
-- [ ] React frontend, Vite configuration, glassmorphism CSS design system, and route pages (Phase 04).
+### Work Not Yet Started (Phase 04 Part 2 to Phase 07)
+- [ ] Phase 04 Part 2: Navigation, filtering & catalog components (deep search, interactive filter tabs, catalog grid states).
 - [ ] End-to-end integration of collections, bookmarks, title details, and import workflows (Phase 05).
 - [ ] Security, accessibility, and performance hardening audits (Phase 06).
 - [ ] Production deployments on Vercel and Node host with Supabase (Phase 07).
@@ -75,9 +84,10 @@
 |---|---|---|---|
 | **Linting** | `npm run lint` | **PASS** | Checked across workspaces; clean execution with 0 warnings. |
 | **Type Checking** | `npm run typecheck` | **PASS** | Strict TypeScript compiler verified across `shared`, `api`, `web` with 0 type errors. |
-| **Unit Tests** | `npm test` | **PASS** | 5 schema unit tests pass in `shared`; 64 tests pass in `api` (total 69 tests pass). |
+| **Monorepo Tests** | `npm test` | **PASS** | 5 schema unit tests in `shared`, 64 tests in `api`, 11 tests in `web` (total 80 automated tests pass). |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | **PASS** | 11/11 tests pass covering design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, and Dashboard features. |
 | **API Integration Tests** | `npm run test:api` | **PASS** | 64 tests pass in `apps/api` using Node test runner against isolated test database. |
-| **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources. |
+| **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources; Vite bundles client assets in ~760ms. |
 | **Database Verification** | `npm run test:db` | **PASS** | 18 assertions pass against live PostgreSQL: 10 tables, triggers, constraints, multi-collection membership, cascade deletions, and cross-owner RLS policies. |
 | **Git Safety** | `git status` | **PASS** | Clean staging; `.env`, `node_modules`, and build artifacts strictly ignored. |
 
@@ -180,3 +190,55 @@
   - `test/import-normalizer.test.js`: Normalization, manhwa detection, ambiguous flags, null resilience, deduplication, review exclusion.
   - `test/import-api.test.js`: Supertest integration tests for auth, search, preview (no DB mutation), duplicate detection, field selection enforcement, atomic commit, rollback on failure, manual creation unaffected.
 - Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:api`, `npm run test:db`, `npm run build`.
+
+### Phase 04 Part 1: Visual Foundation, Design System & Application Shell
+- Configured Vite 5 + React 18 + TypeScript environment in `apps/web`:
+  - Path alias `@/` mapping to `src/`.
+  - Strict type checking with `tsc --noEmit`.
+  - Production build producing optimized CSS and JS assets in `dist/`.
+- Created comprehensive Vanilla CSS Design System inspired closely by the reference image:
+  - `styles/tokens.css`: Typography (`Plus Jakarta Sans` & `Inter`), font scale (`--text-xs` to `--text-5xl`), weights, atmospheric dark blue-gray color palette (`--bg-base`, `--bg-deep`, `--bg-elevated`), glass surfaces (`--glass-light`, `--glass-mid`, `--glass-strong`, `--glass-hover`), borders, shadows, and 2:3 poster aspect ratio (`--poster-aspect`).
+  - `styles/glassmorphism.css`: Multi-tiered glass surface utilities (`.glass`, `.glass-sm`, `.glass-mid`, `.glass-strong`, `.glass-interactive`, `.glass-card`), subtle SVG noise/grain layer, top highlights, and graceful `@supports not (backdrop-filter)` fallback to opaque panels.
+  - `styles/animations.css`: Keyframes for `fadeUp`, `scaleIn`, `shimmer`, `spin`, `pulse-soft`, and `orb-float` with full `prefers-reduced-motion` overrides.
+  - `styles/global.css`: CSS reset, accessible focus ring (`:focus-visible`), selection styling, screen-reader-only utility (`.sr-only`), and ambient light orbs.
+- Created Application Shell components:
+  - `components/layout/AppShell.tsx`: Root shell container with ambient lighting orbs, sidebar, header, and animated main view container.
+  - `components/layout/Header.tsx`: Fixed frosted glass header with brand title, center pill navigation (`Dashboard`, `Bookmarks`, `My List`, `Collections`, `Titles`), quick search bar, notification button, avatar button, and Add Title button.
+  - `components/layout/Sidebar.tsx`: Desktop fixed sidebar navigation containing active route indication, brand mark, top-level routes (`Dashboard`, `Bookmarks`, `My List`, `Collections`, `Titles`), and bottom Settings link (omits Import from primary nav).
+  - `components/layout/MobileNav.tsx`: Bottom navigation bar appearing automatically on screens $\le$ 768px with touch-friendly navigation targets.
+- Created 8 Reusable Shared UI Components:
+  - `Button`: Sizes (`sm`, `md`, `lg`), variants (`primary`, `secondary`, `ghost`, `danger`, `success`), loading spinner, and icon slots.
+  - `Badge`: Pill badge supporting domain media types (`anime`, `manga`, `manhwa`) and semantic variants (`default`, `primary`, `success`, `warning`, `danger`, `info`).
+  - `Input`: Accessible input with floating label, error state (`role="alert"`, `aria-invalid`), hint slot, and left/right icon slots.
+  - `GlassCard`: Polymorphic container component with padding variants (`none`, `sm`, `md`, `lg`) and optional keyboard-accessible interactive button mode.
+  - `PosterCard`: Portrait card enforcing 2:3 aspect ratio, cover image loading with error fallback to initials/media-type placeholder, hover overlay reveal, title truncation, star rating with amber star (`★ 9.1`), and year.
+  - `EmptyState`: Library empty state container with icon, title, description, and call-to-action button (`role="status"`).
+  - `LoadingState`: Frosted glass loading container with spinning ring, pulsing orb, and accessible live region.
+  - `ErrorState`: Alert container with danger icon, error message, and retry button (`role="alert"`).
+  - `components/ui/index.ts`: Centralized barrel export for all UI components.
+- Created Dashboard Page (`pages/Dashboard.tsx` & `pages/Dashboard.css`):
+  - Page header with clear library mission and quick action buttons.
+  - Dual spotlight hero cards (Anime & Manhwa) with play/action pill buttons, tags, ratings, and atmospheric artwork.
+  - Category filter pills row (`All Titles`, `Anime`, `Manga`, `Manhwa`, `Trending`, `Plan to Watch`) with active luminous pill state and interactive filtering.
+  - Section header with sort icon pill and view-all catalog link.
+  - 6-column portrait poster grid displaying representative titles with ratings and badges.
+  - Overview navigation cards to Bookmarks, My List, and Collections.
+- Created Route Placeholder Pages:
+  - `pages/BookmarksPage.tsx`: Status tabs navigation (`All`, `In Progress`, `Plan to Watch`, `Completed`, `On Hold`, `Dropped`) with zero-state badges and empty state.
+  - `pages/MyListPage.tsx`: Personal collections/folders overview with empty state and create collection CTA.
+  - `pages/CollectionsPage.tsx`: Themed collections and multi-title groupings with suggested theme cards and create collection CTA.
+  - `pages/TitlesPage.tsx`: Full catalog search input and dual-action empty state.
+  - `pages/ImportPage.tsx`: MyAnimeList import search input and preview guide.
+  - `pages/SettingsPage.tsx`: Application preferences cards with structured feature sections.
+  - `pages/NotFoundPage.tsx`: Accessible 404 page with return-to-dashboard CTA.
+- Created Automated Frontend Unit/Integration Test Suite:
+  - `apps/web/test/design-system.test.js`: Verifies typography, colors, glass surfaces, radii, 2:3 aspect ratio, and reduced motion.
+  - `apps/web/test/components.test.js`: Verifies barrel exports, image fallback handling, form accessibility, and status roles.
+  - `apps/web/test/routes-and-navigation.test.js`: Verifies router registration, navigation boundaries, page title mappings, and Dashboard features.
+  - 11/11 tests pass with zero failures.
+- Quality Gates Verified:
+  - `npm run lint` — Clean across all 3 workspaces.
+  - `npm run typecheck` — 0 TypeScript errors across all workspaces.
+  - `npm test` — 80 total tests pass (5 shared, 64 API, 11 web).
+  - `npm run build` — Clean production bundle for shared, api, and web.
+  - `npm run test:db` — 18/18 database assertions pass.

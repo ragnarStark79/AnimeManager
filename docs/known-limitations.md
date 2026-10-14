@@ -57,7 +57,9 @@
 
 2. **Local PostgreSQL & Supabase Environment:**
    - A local PostgreSQL service running on port 5432 is used for migration, seed, and constraint test verification via `npm run test:db` and `npm run test:api`.
-   - For containerized Supabase CLI stacks, Docker Desktop / daemon must be started. Hosted Supabase instances work without local Docker.
+3. **Browser Automation in Sandboxed CI/Dev Environment:**
+   - In environments where outbound network access to external binary CDN repositories (`playwright.azureedge.net`) is firewalled or blocked, Playwright driver automatic installation fails.
+   - **Mitigation & Verification:** Frontend verification is established through automated unit tests (`node:test` covering design tokens, glassmorphism fallbacks, UI components, router registration, and accessibility contracts), strict TypeScript typechecking, production Vite build validation, and static CSS media query auditing across 360px, 390px, 768px, 1024px, and 1440px viewports.
 
 ---
 
@@ -67,9 +69,9 @@
    - When the backend connects via a privileged PostgreSQL connection (or Supabase service role), PostgreSQL table-level RLS policies are bypassed by the privileged role.
    - **Mitigation & Enforcement:** Backend service-layer authorization is strictly mandatory. All database queries in the repository layer enforce `owner_id = $x` in both reads and writes. Cross-owner references (e.g. attaching a title belonging to another user to one's own collection or bookmark) are blocked by explicit ownership validation queries before writes occur. In automated integration tests, attempts by Owner B to access or manipulate Owner A's records return 404 or 403.
 
-2. **Phase 03 Scope Boundaries:**
-   - The Jikan external metadata import endpoints (`/api/v1/import/jikan/search`, `/api/v1/import/preview`, `/api/v1/import/commit`) are fully implemented and verified in Phase 03.
-   - File upload handlers for custom covers (`/api/v1/uploads/covers`) and backup streaming exports (`/api/v1/export/*`) remain deferred to Phase 05.
-   - React frontend UI components, Vite setup, and glassmorphism styling are strictly deferred to Phase 04 and Phase 05.
+2. **Phase 04 Part 1 Scope Boundaries:**
+   - The visual foundation, design tokens (`tokens.css`), glassmorphism utilities (`glassmorphism.css`), application shell, header with center pill navigation, sidebar, mobile navigation, 8 shared UI components, Dashboard with spotlight cards & 6-poster grid, and route placeholders (`/bookmarks`, `/my-list`, `/collections`, `/titles`, `/settings`, `*`) are fully established and verified.
+   - Live backend API connectivity (connecting UI forms and cards to Express REST endpoints via fetch/React Query) and real database mutations are strictly scoped for Phase 05.
+   - Deep catalog filtering, multi-facet sorting controls, and title detail dialogs belong to Phase 04 Part 2.
 
 
