@@ -254,17 +254,25 @@ kill -9 <PID>
   4. In production, development sessions are strictly disabled (`ENABLE_DEV_AUTH=false`), and callers must provide valid authenticated Supabase session tokens.
 
 ### Problem 6: Jikan Upstream Connection Timeout or Search Failure
-- **Symptom:** Import search on `http://localhost:5173/import` displays *"Upstream Connection Timed Out"* or *"MyAnimeList Service Unavailable"*.
-- **Root Cause:** The public Jikan API endpoint (`https://api.jikan.moe/v4` hosted at `135.181.39.91` by Hetzner in Helsinki) may experience regional network packet drops, ISP routing blocks, or Cloudflare edge filtering.
+- **Symptom:** Import search on `http://localhost:5173/import` displays *"Upstream Connection Timed Out"* (HTTP 504).
+- **Root Cause:** The public Jikan API endpoint (`https://api.jikan.moe/v4` hosted at `135.181.39.91` by Hetzner in Helsinki) was **officially decommissioned on October 1, 2026**, causing TCP port 443 packets to be dropped.
 - **Diagnostics:**
   Run the dedicated live Jikan diagnostic probe:
   ```bash
   npm run test:jikan:live
   ```
-  This independently tests DNS A/AAAA resolution, TCP port 443 handshake, and a test query to verify whether your local environment can reach the public Jikan instance.
-- **Solution:**
-  1. If Jikan is temporarily unreachable, all core library operations remain 100% operational: manual title creation via **Add Title**, collection organization, bookmark status tracking, and JSON/CSV exports work without external network dependencies.
-  2. When network reachability to Hetzner is restored, the search endpoint automatically resumes functioning without requiring application restarts.
+  This independently tests DNS A/AAAA resolution (OS and Google 8.8.8.8), TCP port 443 handshake, and live HTTP query attempts. Comprehensive diagnostic evidence is documented in `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md`.
+- **Solution & Workarounds:**
+  1. **Manual Entry Fallback:** All core library workflows (manual title entry via **Add Title**, collection organization, bookmark status tracking, and JSON/CSV exports) work 100% offline without external network dependencies.
+  2. **Self-Hosted Jikan Docker Instance:** To restore live MyAnimeList importing locally, run the official open-source Jikan v4 container:
+     ```bash
+     docker run -d --name jikan-rest -p 8080:8080 jikanme/jikan-rest:latest
+     ```
+     Then configure your local `.env`:
+     ```bash
+     JIKAN_BASE_URL=http://localhost:8080/v4
+     ```
+     Restart the API (`npm run dev`) and imports will query your local Jikan instance.
 
 ---
 

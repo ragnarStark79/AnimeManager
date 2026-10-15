@@ -337,3 +337,19 @@ test('JikanClient: Failed requests are NOT cached', async () => {
   assert.equal(res.data.length, 1);
   assert.equal(res.data[0].mal_id, 1);
 });
+
+test('JikanClient: Custom baseUrl parameter routes requests to custom endpoint', async () => {
+  let requestedUrl = null;
+  const client = new JikanClient({
+    baseUrl: 'http://localhost:8080/v4',
+    minIntervalMs: 0,
+    fetchFn: async (url) => {
+      requestedUrl = String(url);
+      return new Response(JSON.stringify({ data: [{ mal_id: 123, title: 'Custom Host Frieren' }] }), { status: 200 });
+    },
+  });
+
+  const res = await client.search('anime', 'frieren');
+  assert.ok(requestedUrl.startsWith('http://localhost:8080/v4/anime?q=frieren'));
+  assert.equal(res.data[0].title, 'Custom Host Frieren');
+});

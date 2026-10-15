@@ -464,13 +464,27 @@ Executed `npm run test:jikan:live`:
 
 ---
 
+### 3.11 Phase 05.4: Definitive Jikan Diagnosis, Import Recovery & Full Technical Report
+
+#### A. Comprehensive Network Stack & Upstream Retirement Diagnosis
+- **Multi-Layer Diagnostic Battery:** Independently tested OS DNS, secondary DNS (Google 8.8.8.8), IPv4 TCP, IPv6 TCP, TLS handshake, `curl -v -m 5`, Node.js Undici `fetch`, direct Express API (`:4000`), and Vite dev proxy (`:5173`).
+- **Decommissioning Finding:** Confirmed that the upstream public service `api.jikan.moe` was officially retired and discontinued on October 1, 2026. Outbound TCP port 443 packets to Hetzner IP `135.181.39.91` are dropped without SYN-ACK response.
+- **Baseline Internet Health:** Confirmed general outbound HTTPS on this host machine is fully operational (Google 174ms, GitHub 262ms, Cloudflare 280ms, MyAnimeList 975ms).
+- **Deliverable:** Created root report `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md` documenting all 16 required sections for independent review by engineers or ChatGPT.
+
+#### B. Adapter Custom Endpoint Verification (`apps/api/test/import-client.test.js`)
+- **Custom Base URL Test:** Added automated regression test confirming that `JikanClient` seamlessly honors custom `baseUrl` settings (e.g. `http://localhost:8080/v4` for self-hosted Docker instances).
+- **Total Monorepo Tests:** 137 / 137 passing (5 shared + 81 API + 51 web).
+
+---
+
 ## 4. Planned Testing Matrix (Phases 01–07)
 
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
-    Comp[Component, Catalog, Responsive, Auth & Import Tests<br/>Node test runner / 51 Passed - Phase 05.3 PASSED]
-    Int[API Integration Tests<br/>Supertest / 80 Passed - Phase 02, 03, 05, 05.2 & 05.3 PASSED]
+    Comp[Component, Catalog, Responsive, Auth & Import Tests<br/>Node test runner / 51 Passed - Phase 05.4 PASSED]
+    Int[API Integration Tests<br/>Supertest / 81 Passed - Phase 02, 03, 05, 05.2, 05.3 & 05.4 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
 
@@ -491,5 +505,6 @@ graph TD
 - [x] **Phase 05.1: Local Startup, API Connectivity & Runtime Verification:** PASSED (Root `npm run dev`, `npm run healthcheck`, Vite proxy `127.0.0.1:4000`, live HTTP 200/401 tests, graceful Ctrl+C shutdown, `docs/LOCAL_DEVELOPMENT.md`).
 - [x] **Phase 05.2: Authentication, JWT Lifecycle & Protected Workflow Repair:** PASSED (122/122 monorepo tests: 5 shared, 71 API, 46 web; guarded dev session endpoint, client expiration auto-pruning, debounced 401 recovery, zero secret leakage in client bundle, live HTTP CRUD verified).
 - [x] **Phase 05.3: Jikan Import Search Connectivity & Error Diagnostics:** PASSED (136/136 monorepo tests: 5 shared, 80 API, 51 web; 8-category error classification, HTTP 504 gateway timeout, sanitized diagnostic logs, UI error sanitization, candidate suppression on failure, live Jikan probe tool).
+- [x] **Phase 05.4: Definitive Jikan Diagnosis, Import Recovery & Full Technical Report:** PASSED (137/137 monorepo tests: 5 shared, 81 API, 51 web; root cause conclusively established as Oct 1, 2026 public Jikan shutdown; delivered `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md`; custom baseUrl verified).
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
 - [ ] **Phase 07: Production Smoke Tests:** Health, login, title/collection/bookmark management on production deployment.

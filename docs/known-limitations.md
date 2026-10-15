@@ -1,7 +1,7 @@
 # AnimeManager — Known Limitations & Scope Constraints
 
-**Document Version:** 1.5
-**Phase:** Phase 05.3 (Jikan Import Search Connectivity & Error Diagnostics)
+**Document Version:** 1.6
+**Phase:** Phase 05.4 (Definitive Jikan Connectivity Diagnosis, Import Recovery & Technical Report)
 **Status:** Documented & Verified
 
 ---
@@ -22,13 +22,14 @@
    - MyAnimeList catalogs Japanese manga, Korean manhwa, and Chinese manhua under a single `/manga/` taxonomy.
    - **Mitigation:** The import normalizer inspects the publication type. If the type is explicitly `"Manhwa"`, it preselects `manhwa`. If ambiguous, it flags `needsMediaConfirmation: true` and includes a warning requiring the user to explicitly select `manga` or `manhwa` before commit.
 
-4. **Public Jikan Server Network Reachability & Hetzner Routing:**
-   - The primary public Jikan endpoint (`https://api.jikan.moe/v4`) resolves to Hetzner Online servers in Helsinki (`135.181.39.91` and `2a01:4f9:c010:b863::1`).
-   - Depending on ISP routing, regional firewalls, Cloudflare edge filters, or Hetzner border router drops, TCP port 443 handshakes can experience packet loss or connection timeouts (`ConnectTimeoutError` / `ETIMEDOUT`).
+4. **Public Jikan Server Retirement & Self-Hosted Option (Phase 05.4):**
+   - The primary public Jikan endpoint (`https://api.jikan.moe/v4`) was **officially decommissioned on October 1, 2026**. Port 443 TCP packets to Hetzner host `135.181.39.91` are dropped, triggering HTTP 504 timeouts.
+   - Full diagnostic findings and network socket traces are documented in the repository root report [JIKAN_IMPORT_DIAGNOSTIC_REPORT.md](file:///Users/ragnar/Documents/Projects/AnimeManager/JIKAN_IMPORT_DIAGNOSTIC_REPORT.md).
    - **Mitigation & Diagnostics:**
-     - The backend classifies these failures as `UPSTREAM_TIMEOUT` and returns a standard HTTP 504 `EXTERNAL_PROVIDER_TIMEOUT` envelope with a human-readable message rather than a generic HTTP 502 with `fetch failed`.
-     - The frontend sanitizes all error displays, instructs the user that MyAnimeList search is temporarily unavailable, and immediately hides stale candidates from prior searches.
-     - A zero-dependency diagnostic probe (`npm run test:jikan:live` via `scripts/test-jikan-live.js`) is provided to independently verify DNS and TCP connectivity to Jikan.
+     - The backend classifies these failures as `UPSTREAM_TIMEOUT` and returns a standard HTTP 504 `EXTERNAL_PROVIDER_TIMEOUT` envelope with an actionable message.
+     - The frontend sanitizes all error displays and immediately hides stale candidates from prior searches.
+     - A zero-dependency diagnostic probe (`npm run test:jikan:live` via `scripts/test-jikan-live.js`) verifies DNS and TCP connectivity.
+     - **Self-Hosted Recovery:** Users can run a local private Jikan v4 Docker container (`docker run -d -p 8080:8080 jikanme/jikan-rest:latest`) and point `.env` to `JIKAN_BASE_URL=http://localhost:8080/v4`.
      - Core library operations (manual title entry, collection organization, bookmark tracking, and CSV/JSON export) operate completely independently of upstream Jikan availability.
 
 ---

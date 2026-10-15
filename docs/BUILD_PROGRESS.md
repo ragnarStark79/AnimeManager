@@ -6,8 +6,8 @@
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
 - **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 05.3: Diagnose and Fix Jikan Import Search (HTTP 502)**
-- **Phase 05.3 Status:** **COMPLETED** (Diagnosed root-cause connection timeout to upstream Jikan API at 135.181.39.91:443; implemented 8-category network error classification, HTTP 504 gateway timeout semantics, sanitized upstream diagnostic logging, frontend error sanitization replacing raw "fetch failed", candidate suppression on failure, live Jikan probe script, 136 monorepo tests pass [5 shared + 80 API + 51 web], and all quality gates clean)
+- **Current Active Phase:** **Phase 05.4: Definitive Jikan Connectivity Diagnosis, Import Recovery, and Full Technical Report**
+- **Phase 05.4 Status:** **COMPLETED** (Definitively diagnosed external upstream decommissioning of public hosted Jikan API at api.jikan.moe on Oct 1, 2026; confirmed general outbound HTTPS is fully operational; delivered comprehensive root report [JIKAN_IMPORT_DIAGNOSTIC_REPORT.md](file:///Users/ragnar/Documents/Projects/AnimeManager/JIKAN_IMPORT_DIAGNOSTIC_REPORT.md) for independent review; enhanced dual-stack diagnostic probe; verified 137 monorepo tests pass [5 shared + 81 API + 51 web], 18 DB assertions, and production build)
 - **Next Phase:** **Phase 06: Hardening: Security, Accessibility, & Performance** (Pending user review and authorization)
 
 ---
@@ -27,6 +27,7 @@
 | **Phase 05.1** | Local Startup, API Connectivity & Runtime Verification | **COMPLETED** | Diagnosed and fixed `ECONNREFUSED` / HTTP 500 error; established zero-dependency concurrent runner `scripts/dev.js` (`npm run dev`) with labeled logs (`[api]`, `[web]`), graceful shutdown, and port conflict checks; created `scripts/healthcheck.js` (`npm run healthcheck`) verifying API, DB, and Vite proxy; aligned Vite proxy target to `http://127.0.0.1:4000`; created `docs/LOCAL_DEVELOPMENT.md` and root `README.md`; verified live HTTP requests. |
 | **Phase 05.2** | Authentication, JWT Lifecycle & Protected Workflow Repair | **COMPLETED** | Diagnosed and resolved 401 Unauthorized errors caused by expired static env token and invalid dev signature; implemented guarded backend development session endpoint (`GET /api/v1/auth/dev-session`, `POST /api/v1/auth/dev-token`) issuing fresh 24h JWT for seeded owner (`00000000-0000-0000-0000-000000000001`); implemented client-side `isTokenExpired()` pruning on startup, debounced 401 auto-recovery, and Settings page session management; verified zero backend secrets in production frontend bundle; 122 automated tests pass. |
 | **Phase 05.3** | Jikan Import Search Connectivity & Error Diagnostics | **COMPLETED** | Diagnosed upstream network timeout on public Jikan server (Hetzner IP 135.181.39.91); added 8-category network error classification (`UPSTREAM_DNS_ERROR`, `UPSTREAM_CONNECTION_ERROR`, `UPSTREAM_TLS_ERROR`, `UPSTREAM_TIMEOUT`, `UPSTREAM_RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_BAD_RESPONSE`, `UPSTREAM_INVALID_PAYLOAD`); upgraded timeout to HTTP 504; sanitized logs with request IDs; enhanced frontend error presentation and candidate suppression; created `scripts/test-jikan-live.js`; 136 monorepo tests pass. |
+| **Phase 05.4** | Definitive Jikan Diagnosis, Import Recovery & Technical Report | **COMPLETED** | Conclusively identified that public api.jikan.moe was retired on Oct 1, 2026; confirmed general outbound HTTPS is healthy (Google, GitHub, MAL); delivered root report `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md` for independent review; enhanced dual-stack probe; added custom baseUrl tests (137 tests pass). |
 | **Phase 06** | Hardening: Security, Accessibility, & Performance | **PENDING REVIEW** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. Awaiting user authorization. |
 | **Phase 07** | Deployment Preparation & Production Verification | **NOT STARTED** | Frontend deployed to Vercel; Express API deployed to compatible Node host; Supabase production instance configured with RLS and Storage policies; smoke tests pass; rollback plan verified. |
 
@@ -399,3 +400,20 @@
   - 3 new API tests in `apps/api/test/import-api.test.js` (504 timeout formatting, 502 DNS failure formatting, empty search results).
   - 5 new frontend tests in `apps/web/test/import-workflows.test.js` (sanitization of `fetch failed`, error title mapping, candidate suppression on failure, concurrency guard, preview error state).
 - Monorepo automated test count increased to **136 / 136 passing** (5 shared + 80 API + 51 web).
+
+### Phase 05.4: Definitive Jikan Diagnosis, Import Recovery & Full Technical Report
+- Executed timestamped multi-layer network diagnostic protocol across DNS, TCP sockets, TLS handshakes, system `curl`, Node.js Undici, and application routes:
+  - Verified DNS resolution succeeds across OS default and secondary (Google 8.8.8.8) resolvers (`135.181.39.91` and `2a01:4f9:c010:b863::1`).
+  - Verified IPv4 TCP handshake to `135.181.39.91:443` times out with 0 response.
+  - Verified system `curl -v -m 5` times out with error code 28 (`Operation timed out after 5006ms`).
+  - Verified Node.js `fetch` throws `ConnectTimeoutError (UND_ERR_CONNECT_TIMEOUT)` after attempting both addresses.
+  - Verified general outbound HTTPS connectivity from this exact host machine is 100% operational (`google.com`: 174ms, `api.github.com`: 262ms, `1.1.1.1`: 280ms, `myanimelist.net`: 975ms).
+  - Corroborated with upstream `jikan-me` GitHub repository announcements: **the public hosted service at `api.jikan.moe` was officially retired and discontinued on October 1, 2026**.
+- Created comprehensive standalone root technical deliverable: `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md` containing all 16 required sections formatted for independent review by engineers or ChatGPT.
+- Enhanced `scripts/test-jikan-live.js` (`npm run test:jikan:live`):
+  - Probes OS default IPv4 and IPv6 DNS records.
+  - Compares with Google 8.8.8.8 DNS resolver.
+  - Evaluates TCP socket connectivity on port 443 with explicit timeout.
+  - Reports actionable self-hosted Docker instructions if public host is down.
+- Added regression test in `apps/api/test/import-client.test.js` validating custom `JIKAN_BASE_URL` routing for private self-hosted Jikan instances.
+- Monorepo automated test count increased to **137 / 137 passing** (5 shared + 81 API + 51 web).
