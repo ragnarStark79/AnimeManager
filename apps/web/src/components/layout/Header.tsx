@@ -70,6 +70,11 @@ export function Header({ title }: HeaderProps) {
               aria-label="Search sample catalog"
               onFocus={() => setSearchOpen(true)}
               onBlur={() => setSearchOpen(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.currentTarget.blur();
+                }
+              }}
             />
           </form>
         </div>

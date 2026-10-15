@@ -147,6 +147,15 @@ export function TitlesPage() {
               placeholder="Search by title, genre…"
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  if (query) {
+                    handleClear();
+                  } else {
+                    e.currentTarget.blur();
+                  }
+                }
+              }}
               autoComplete="off"
               spellCheck={false}
               aria-label="Search titles"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FolderKanban, Plus, Sparkles, Info, X } from 'lucide-react';
 import { EmptyState, GlassCard } from '../components/ui';
@@ -13,6 +13,16 @@ const SUGGESTED_THEMES = [
 
 export function CollectionsPage() {
   const [newOpen, setNewOpen] = useState(false);
+
+  // Close dialog on Escape key
+  useEffect(() => {
+    if (!newOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNewOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [newOpen]);
 
   return (
     <div className="placeholder-page">
@@ -95,7 +105,15 @@ export function CollectionsPage() {
 
       {/* ── New Collection preview dialog ── */}
       {newOpen && (
-        <div className="collections-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="new-col-heading">
+        <div
+          className="collections-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-col-heading"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setNewOpen(false);
+          }}
+        >
           <div className="collections-modal-panel">
             <div className="collections-modal-header">
               <h2 id="new-col-heading" className="collections-modal-title">New Collection</h2>

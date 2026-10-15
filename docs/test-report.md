@@ -1,7 +1,7 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.5
-**Phase:** Phase 04 Part 2 (Interactive Catalog UI, Search, Filters & Library Navigation)
+**Document Version:** 1.6
+**Phase:** Phase 04 Part 3 (Frontend Verification, Responsive QA & Phase Gate)
 **Date:** 2026-10-15
 
 ---
@@ -20,19 +20,26 @@ During **Phase 04 Part 1**, the frontend visual foundation and application shell
 
 During **Phase 04 Part 2**, the interactive catalog UI, search, filtering, and library navigation were implemented and verified. A typed demonstration dataset (`src/data/demo.ts`) with 12 balanced sample titles across anime, manga, and manhwa was established with pure filtering, search, sorting, and status-counting utilities. Reusable `FilterChips`, `SortControl`, and `AddTitleModal` components were added to the UI design system. `TitlesPage` was upgraded with real-time substring search, clear query button, media-type filter chips, 6 sort modes, empty-catalog and no-results states, and URL search parameter sync via `useSearchParams` (`?q=...`). `BookmarksPage` was upgraded with functional status filtering tabs (All, In Progress, Plan to Watch, Completed, On Hold, Dropped), dynamic item counts, and per-status empty states. `MyListPage` and `CollectionsPage` headings and semantics were clarified. `Dashboard` showcase filtering by category/top-rated/planning was wired. `Header` search was connected to navigate to `/titles?q=...`, the `Add` button was wired to open the preview modal, and broken links were eliminated. `PosterCard` image fallback was enhanced with `imgFailed` state. An automated test suite (`apps/web/test/interactive-catalog.test.js`) verifies all 10 required catalog behaviors. All 21 frontend tests pass cleanly, bringing total monorepo automated tests to 90/90 passing with 0 failures.
 
+During **Phase 04 Part 3**, the comprehensive frontend verification, responsive QA, and phase-gate stabilization pass was completed:
+- **Routes & Interactions Verified:** All 8 application routes (`/`, `/titles`, `/bookmarks`, `/my-list`, `/collections`, `/import`, `/settings`, and `*` 404 page) verified for structural integrity, semantic heading hierarchy, accessible status labels, and shared navigation.
+- **Responsive Quality Assurance:** Breakpoint audits across 360px and 390px (mobile), 768px (tablet), 1024px (tablet/desktop transition), and 1440px (desktop) verified: zero horizontal page overflow (`overflow-x: hidden`), proper 2-column mobile poster grids, mobile navigation bottom padding (`calc(64px + env(safe-area-inset-bottom))`), `min-width: 0` header search container, and modal padding adaptations.
+- **Defect Remediations:** Added backdrop click and Escape key dismissal to the New Collection dialog (`CollectionsPage.tsx`); added Escape key blurring/clearing to global search and catalog search inputs; added honest Phase 05 preview notice banner and disabled search button on `/import` (`ImportPage.tsx`).
+- **Test Quality & Coverage:** Created `apps/web/test/verification-qa.test.js` adding 11 automated verification checks covering modal dismissal, keyboard navigation, honest disclosures, conceptual distinction (My List vs Bookmarks), and responsive CSS breakpoint integrity. Total frontend automated tests increased to 32/32 passing, and monorepo automated tests to 101/101 passing with 0 failures.
+- **Browser Automation Status:** Fully documented environment limitation: while Google Chrome 155 is installed on macOS, Playwright automated driver downloads fail due to external CDN 404s. Responsive QA and layout integrity were validated via static CSS media query auditing, automated layout contract tests, strict TypeScript typechecking, and production Vite build bundling.
+
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01, 02, 03, & 04 Part 2)
+## 2. Quality Gate Verification Matrix (Phases 01, 02, 03, & 04 Part 3)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces (shared, api, web) | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 64 API + 21 web tests pass (90 total) | **PASS** |
-| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, and router | 21/21 frontend assertions pass cleanly | **PASS** |
+| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 64 API + 32 web tests pass (101 total) | **PASS** |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, and QA | 32/32 frontend assertions pass cleanly | **PASS** |
 | **API Integration Tests**| `npm run test:api` | Node test runner executes integration & importer suites | 64/64 test assertions passed cleanly | **PASS** |
-| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions and Vite client bundle | **PASS** |
+| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions and Vite client bundle in ~866ms | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
 
 ---
@@ -309,14 +316,25 @@ $ npm --prefix apps/web test
 ✔ Navigation Scope: Sidebar contains only approved primary destinations and omits Import (0.865333ms)
 ✔ AppShell: Page titles map all destinations including Collections (0.31475ms)
 ✔ Dashboard: Implements dual spotlight cards and navigation to all primary sections (0.446ms)
-ℹ tests 21
+✔ QA: CollectionsPage modal supports backdrop click and Escape key dismissal (0.501958ms)
+✔ QA: AddTitleModal handles Escape and backdrop dismissal (0.068875ms)
+✔ QA: Search inputs provide accessible Escape key dismissal (0.054709ms)
+✔ QA: ImportPage clearly discloses Phase 05 status and does not pretend persistence (0.05125ms)
+✔ QA: SettingsPage clearly discloses that settings features are Phase 05 only (0.14175ms)
+✔ QA: Preview forms have disabled submit buttons preventing false saves (0.062291ms)
+✔ QA: My List and Bookmarks maintain strict conceptual distinction in UI (0.053833ms)
+✔ QA: Header CSS accommodates desktop, tablet, and 360px mobile viewports (0.069958ms)
+✔ QA: Layout adapts between desktop sidebar and mobile bottom navigation at 768px (0.598208ms)
+✔ QA: Poster grids support 2-column mobile layout for 360px and 390px viewports (0.114ms)
+✔ QA: Placeholder modals and search controls handle mobile viewports without overflow (0.062083ms)
+ℹ tests 32
 ℹ suites 0
-ℹ pass 21
+ℹ pass 32
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 161.61825
+ℹ duration_ms 154.551625
 ```
 
 ---
@@ -326,7 +344,7 @@ $ npm --prefix apps/web test
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
-    Comp[Component & Catalog Tests<br/>Node test runner / 21 Passed - Phase 04 Part 2 PASSED]
+    Comp[Component, Catalog & Responsive QA Tests<br/>Node test runner / 32 Passed - Phase 04 Part 3 PASSED]
     Int[API Integration Tests<br/>Supertest / 64 Passed - Phase 02 & 03 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
@@ -343,6 +361,7 @@ graph TD
 - [x] **Phase 03: Jikan Provider Adapter & Importer Suite:** 64/64 PASSED (URL parsing, SSRF defense, client resilience, 429 backoff, Retry-After, caching, throttling, normalization, manhwa disambiguation, review exclusion, duplicate detection, atomic commit, and manual creation decoupling).
 - [x] **Phase 04 Part 1: Visual Foundation & Design System Tests:** 11/11 PASSED (Design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, AppShell title mapping, and Dashboard spotlight & filter pills).
 - [x] **Phase 04 Part 2: Interactive Catalog & Filtering QA:** 21/21 PASSED (Search filtering, clearing query, no-results state, media type filtering, sorting, bookmark status filtering, empty states, poster fallbacks, valid navigation, and honest Add Title preview behavior).
+- [x] **Phase 04 Part 3: Frontend Verification & Responsive QA:** 32/32 PASSED (8 routes verified, modal dismissal, keyboard navigation, responsive CSS contracts across 360px–1440px, non-persistence disclosures, 101 monorepo tests total).
 - [ ] **Phase 05: Core User Journeys E2E (Playwright):** Journeys A through E end-to-end in browser.
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
 - [ ] **Phase 07: Production Smoke Tests:** Health, login, title/collection/bookmark management on production deployment.

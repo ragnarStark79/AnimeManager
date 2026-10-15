@@ -426,3 +426,23 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+
+/* ── Mobile Breakpoints ───────────────────────────────────────── */
+@media (max-width: 500px) {
+  .placeholder-import-search {
+    flex-direction: column;
+  }
+
+  .placeholder-import-search .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .collections-modal-backdrop {
+    padding: var(--space-4);
+  }
+
+  .collections-modal-panel {
+    padding: var(--space-4);
+  }
+}
