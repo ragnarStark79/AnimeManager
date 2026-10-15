@@ -47,17 +47,26 @@ async function main() {
     console.log(`     Version: ${data.version || '1.0.0'}, Uptime: ${data.uptime ?? 0}s`);
 
     if (data.database === 'connected') {
-      console.log(`   ${GREEN}✔ Database Connection: CONNECTED (PostgreSQL healthy)${RESET}`);
+      const targetLabel = data.databaseTarget === 'supabase'
+        ? 'Supabase Hosted PostgreSQL'
+        : (data.databaseTarget === 'local_postgres' ? 'Local PostgreSQL' : 'Remote PostgreSQL');
+      console.log(`   ${GREEN}✔ Database Connection: CONNECTED (${targetLabel} at ${data.databaseHost || 'configured host'})${RESET}`);
+      if (data.schema === 'ready') {
+        console.log(`   ${GREEN}✔ Database Schema: READY (${data.tablesCount ?? 10} public tables verified)${RESET}`);
+      } else {
+        console.log(`   ${RED}✖ Database Schema: INCOMPLETE (Run migrations via 'npm run db:migrate:remote')${RESET}`);
+        hasErrors = true;
+      }
     } else {
       console.log(`   ${RED}✖ Database Connection: DISCONNECTED (degraded state)${RESET}`);
-      console.log(`     Action: Verify local PostgreSQL is running on localhost:5432 and check DATABASE_URL in .env\n`);
+      console.log(`     Action: Verify database connection string in DATABASE_URL\n`);
       hasErrors = true;
     }
 
     if (data.status === 'healthy') {
       console.log(`   ${GREEN}✔ Overall API Status: HEALTHY${RESET}\n`);
     } else {
-      console.log(`   ${YELLOW}⚠️ Overall API Status: DEGRADED (Database unreachable)${RESET}\n`);
+      console.log(`   ${YELLOW}⚠️ Overall API Status: DEGRADED (Database or schema issue)${RESET}\n`);
       hasErrors = true;
     }
   }

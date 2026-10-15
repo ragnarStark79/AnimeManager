@@ -22,6 +22,9 @@
     "test": "npm run --workspaces --if-present test",
     "test:api": "npm --prefix apps/api test",
     "test:db": "node scripts/verify-db.js",
+    "test:supabase:remote": "node scripts/verify-supabase-remote.js",
+    "test:supabase:workflows": "node scripts/verify-supabase-workflows.js",
+    "db:migrate:remote": "node scripts/migrate-supabase.js",
     "test:metadata:live": "node scripts/test-tenrai-live.js",
     "test:tenrai:live": "node scripts/test-tenrai-live.js",
     "test:jikan:live": "node scripts/test-jikan-live.js"

@@ -9,7 +9,9 @@ export const authController = {
   getDevSession(req: Request, res: Response, next: NextFunction): void {
     try {
       // Security Boundary: Dev auth is strictly forbidden in production or when disabled
-      const isDevAuthEnabled = config.NODE_ENV === 'development' && config.ENABLE_DEV_AUTH !== false;
+      const isDevAuthEnabled =
+        (config.NODE_ENV === 'development' || config.NODE_ENV === 'test') &&
+        config.ENABLE_DEV_AUTH !== false;
 
       if (!isDevAuthEnabled) {
         throw new NotFoundError('The requested API endpoint does not exist');

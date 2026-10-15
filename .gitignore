@@ -44,4 +44,5 @@ Thumbs.db
 *.sw?
 
 # Supabase Local
-.supabase/temp/
+.supabase/
+supabase/.temp/

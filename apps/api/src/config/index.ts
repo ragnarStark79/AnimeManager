@@ -39,6 +39,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required').default('postgresql://ragnar@localhost:5432/animemanager_test'),
+  SUPABASE_DATABASE_URL: z.string().optional(),
   SUPABASE_JWT_SECRET: z.string().min(16, 'SUPABASE_JWT_SECRET must be at least 16 characters').default('development-jwt-secret-min-16-chars-long!'),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
@@ -67,9 +68,42 @@ function loadConfig() {
     throw new Error(`[Config Error] Invalid or missing environment configuration: ${result.error.errors.map((e) => e.path.join('.')).join(', ')}`);
   }
 
-  // Strict Security Guard: Never allow development auth flag in production
-  if (result.data.NODE_ENV === 'production' && result.data.ENABLE_DEV_AUTH === true) {
-    throw new Error('[Config Error] Fatal: ENABLE_DEV_AUTH cannot be enabled in production environments.');
+  // Resolve effective database URL:
+  // 1. In automated test runs (NODE_ENV=test), strictly isolate against local test database
+  //    unless explicitly authorized via ALLOW_REMOTE_DB_TESTS=true
+  // 2. In development or production, explicit SUPABASE_DATABASE_URL or DATABASE_URL is used
+  let effectiveDbUrl = process.env.SUPABASE_DATABASE_URL?.trim() || result.data.DATABASE_URL;
+
+  if (result.data.NODE_ENV === 'test' && process.env.ALLOW_REMOTE_DB_TESTS !== 'true') {
+    effectiveDbUrl = process.env.TEST_DATABASE_URL?.trim() || 'postgresql://ragnar@localhost:5432/animemanager_test';
+  }
+
+  // Identify database target identity without exposing credentials
+  let databaseTarget: 'supabase' | 'local_postgres' | 'remote_postgres' = 'local_postgres';
+  if (effectiveDbUrl.includes('supabase.co') || effectiveDbUrl.includes('supabase.com')) {
+    databaseTarget = 'supabase';
+  } else if (effectiveDbUrl.includes('localhost') || effectiveDbUrl.includes('127.0.0.1')) {
+    databaseTarget = 'local_postgres';
+  } else {
+    databaseTarget = 'remote_postgres';
+  }
+
+  let sanitizedDbHost = 'unknown';
+  try {
+    const parsedDbUrl = new URL(effectiveDbUrl);
+    sanitizedDbHost = `${parsedDbUrl.host}${parsedDbUrl.pathname}`;
+  } catch {
+    sanitizedDbHost = 'invalid-connection-string';
+  }
+
+  // Strict Security Guard: Never allow development auth or localhost database in production
+  if (result.data.NODE_ENV === 'production') {
+    if (result.data.ENABLE_DEV_AUTH === true) {
+      throw new Error('[Config Error] Fatal: ENABLE_DEV_AUTH cannot be enabled in production environments.');
+    }
+    if (databaseTarget === 'local_postgres') {
+      throw new Error('[Config Error] Fatal: Production environment cannot use localhost PostgreSQL.');
+    }
   }
 
   // Resolve effective metadata API base URL:
@@ -99,6 +133,9 @@ function loadConfig() {
 
   return {
     ...result.data,
+    DATABASE_URL: effectiveDbUrl,
+    databaseTarget,
+    sanitizedDbHost,
     METADATA_API_BASE_URL: effectiveMetadataUrl,
     JIKAN_BASE_URL: effectiveMetadataUrl,
   };

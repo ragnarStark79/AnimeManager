@@ -87,7 +87,7 @@ If using macOS Postgres.app, ensure the elephant icon in the menu bar is running
 brew services start postgresql@16
 ```
 
-### B. Running Database Verification & Migrations
+### B. Running Local Database Verification & Migrations
 The repository includes a safe database verification runner that applies migrations and seeds to the isolated test database:
 
 ```bash
@@ -100,6 +100,36 @@ This executes `scripts/verify-db.js`, which:
 3. Applies `supabase/migrations/20261014000002_security_policies.sql`.
 4. Applies `supabase/seed.sql`.
 5. Runs 18 automated SQL assertions verifying multi-collection mapping, cascade rules, and RLS policies.
+
+### C. Connecting to Hosted Supabase PostgreSQL (Phase 05.6)
+To connect the local application or production environment to the actual hosted Supabase PostgreSQL database:
+
+1. In `.env`, configure `DATABASE_URL` (or `SUPABASE_DATABASE_URL`):
+   ```bash
+   # Direct connection (IPv6 enabled networks):
+   DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+   # Or Supavisor Pooler (IPv4 environments):
+   # DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+   ```
+2. Apply migrations to the hosted database:
+   ```bash
+   npm run db:migrate:remote
+   ```
+3. Run the dedicated, opt-in remote database verification suite:
+   ```bash
+   ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:remote
+   ```
+4. Run the end-to-end API user workflows verification suite against the running API:
+   ```bash
+   ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:workflows
+   ```
+5. Check health:
+   ```bash
+   npm run healthcheck
+   ```
+
+> [!SECURITY]
+> Standard test commands (`npm test` and `npm run test:db`) automatically run against the local test database and are strictly isolated from your Supabase production database. Remote tests require explicit `ALLOW_REMOTE_DB_TESTS=true`.
 
 ---
 

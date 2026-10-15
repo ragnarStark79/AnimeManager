@@ -66,9 +66,10 @@
    - The current development environment is running Node.js `v26.10.0`.
    - Production targets (Vercel, Render) typically run Node 20 or 22 LTS. All dependencies and build targets remain strictly compatible with Node 20+ LTS standards.
 
-2. **Local PostgreSQL & Supabase Environment:**
-   - A local PostgreSQL service running on port 5432 is used for migration, seed, and constraint test verification via `npm run test:db` and `npm run test:api`.
-   - **Remote Supabase IPv6-Only Routing:** Certain hosted Supabase endpoints (e.g. direct database connection hostnames) resolve exclusively via IPv6 `AAAA` records. On local development machines or ISP routes where IPv6 traffic is not natively routed, direct connections fail with `EHOSTUNREACH`. For local development, the repository defaults to local PostgreSQL (`animemanager_test` on `localhost:5432`), while remote Supabase remains the production deployment target.
+2. **Hosted Supabase PostgreSQL & Connection Routing (Phase 05.6):**
+   - The application now supports both local PostgreSQL (for isolated unit/integration tests) and hosted Supabase PostgreSQL (for production and remote staging).
+   - **Direct IPv6 vs Pooler Routing:** The direct connection endpoint (`db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`) resolves over IPv6 (`AAAA`). On environments with native IPv6 routing, direct connections operate with low latency (393ms handshake). For environments lacking IPv6 egress, Supabase's Supavisor connection pooler (`aws-0-ap-southeast-1.pooler.supabase.com:6543`) is fully supported and documented in `.env.example`.
+   - **Remote Verification Safety Guard:** To prevent test suites from running against production databases, remote tests require `ALLOW_REMOTE_DB_TESTS=true` (`npm run test:supabase:remote` and `npm run test:supabase:workflows`). Standard `npm test` and `npm run test:db` automatically target local PostgreSQL.
 
 3. **Browser Automation in Sandboxed CI/Dev Environment:**
    - In environments where outbound network access to external binary CDN repositories (`playwright.azureedge.net`) is firewalled or blocked, Playwright driver automatic installation fails.

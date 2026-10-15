@@ -28,29 +28,33 @@ During **Phase 05.3**, Jikan import search error classification and resilience w
 
 During **Phase 05.4**, definitive Jikan network diagnostics established that the public hosted service at `api.jikan.moe` was officially discontinued and retired by its maintainers on October 1, 2026. Documented in `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md`.
 
-During **Phase 05.5**, AnimeManager successfully migrated from the discontinued Jikan public API to **Tenrai v1 API** (`https://api.tenrai.org/v1`):
-- **Live Provider Verification:** Tenrai DNS, TLSv1.3, anime/manga search, detail endpoints, and parameter validation were verified live via `scripts/test-tenrai-live.js` (`npm run test:metadata:live`).
-- **Provider-Neutral Adapter:** Refactored client into `MetadataClient` with safe `URL` and `URLSearchParams` building, inter-request rate limiting (350ms interval ~2.8 rps < 4 rps ceiling), caching, and backwards-compatible configuration fallbacks (`METADATA_API_BASE_URL` with `JIKAN_BASE_URL` fallback).
-- **Frontend Error Experience:** Upgraded `apps/web/src/pages/ImportPage.tsx` with granular error mapping (504, 502/503, 429, 401/403, 400/422, network), upstream request ID tracing, and direct "Create Title Manually Instead" fallback navigation.
-- **Live E2E Verification:** Verified live search for "Frieren" and "Naruto", preview generation, user title editing ("Naruto (Import Verified)"), atomic commit, duplicate prevention (409 Conflict), and offline manual title creation through the Vite development proxy (`:5173` -> `:4000` -> PostgreSQL).
-- **Comprehensive Documentation:** Produced repository-root deliverable `IMPORT_PROVIDER_MIGRATION_REPORT.md` documenting all 24 required technical sections.
-- **Test Metrics:** Monorepo automated test count increased to **139 / 139 passing** (5 shared + 83 API + 51 web), plus 18 database assertions = **157 total passing checks**.
+During **Phase 05.5**, AnimeManager successfully migrated from the discontinued Jikan public API to **Tenrai v1 API** (`https://api.tenrai.org/v1`), verified with live search, preview, atomic commit, and 139 passing tests.
+
+During **Phase 05.6**, AnimeManager connected its Express backend to hosted **Supabase PostgreSQL 17.11** (`db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`):
+- **Remote Migrations:** Applied canonical migrations via `supabase db push` creating 10 tables, 3 triggers, and 35 RLS policies.
+- **Remote Database Verification (`ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:remote`):** 23/23 assertions passed against live Supabase PostgreSQL (version, RLS, triggers, check constraints, unique indexes, transactions, owner isolation, connection restart, and scoped cleanup).
+- **Remote API Workflows Verification (`ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:workflows`):** All 5 user workflows (Titles CRUD, Collections multi-membership, Bookmarks progress, Tenrai metadata import with duplicate protection, and JSON/CSV exports) executed cleanly against the Supabase-backed API.
+- **Isolated Local Test Suite (`npm test`):** Local automated test runner preserved 100% test isolation, completing 139/139 tests against local test DB in ~2.4s.
+- **Comprehensive Documentation:** Produced root report `SUPABASE_DATABASE_INTEGRATION_REPORT.md` covering all 25 required sections.
 
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01 through 05.5)
+## 2. Quality Gate Verification Matrix (Phases 01 through 05.6)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
-| **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
+| **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist`, `.supabase` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces (shared, api, web) | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
 | **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 83 API + 51 web tests pass (139 total) | **PASS** |
 | **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, QA, Phase 05 workflows, auth lifecycle, and import workflows | 51/51 frontend assertions pass cleanly | **PASS** |
 | **API Integration Tests**| `npm run test:api` | Node test runner executes integration, importer, export, auth, and Tenrai adapter suites | 83/83 test assertions passed cleanly | **PASS** |
 | **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles; zero secret leaks in client assets | Built cleanly with type definitions and Vite client bundle; 0 leaks | **PASS** |
-| **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
+| **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live local PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
+| **Remote Supabase DB Tests** | `ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:remote` | Probes live Supabase PostgreSQL for schema, RLS, triggers, constraints, isolation | All 23 assertions passed against Supabase | **PASS** |
+| **Remote Supabase Workflows**| `ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:workflows` | Exercises Title CRUD, Collections, Bookmarks, Import, Export against Supabase API | All 5 user workflows passed cleanly | **PASS** |
 | **Live Metadata Diagnostics** | `npm run test:metadata:live` | Probes live DNS, TLS, search, and detail endpoints against Tenrai v1 | All 8 live checks pass with HTTP 200/400 | **PASS** |
+| **API & DB Healthcheck** | `npm run healthcheck` | Verifies API process, database connection, schema readiness, and Vite proxy | All checks operational (databaseTarget: supabase) | **PASS** |
 
 ---
 

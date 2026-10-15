@@ -1,9 +1,9 @@
 # AnimeManager — System Architecture
 
-**Document Version:** 1.8
-**Status:** Authentication, JWT Lifecycle & Protected Workflow Architecture Complete (Phase 05.2)
-**Implementation State:** Phases 01, 02, 03, 04, 05, 05.1, and 05.2 Complete (PostgreSQL Schema, Express REST API, Resilient Jikan Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Jikan Import UI, JSON/CSV Export Endpoints, Concurrent Development Runner, Healthcheck Suite, Guarded Dev Session Management, Client Expiry Pruning)
-**Next Phase:** Phase 06 Hardening: Security, Accessibility, & Performance (Pending user review and authorization)
+**Document Version:** 2.0
+**Status:** Supabase PostgreSQL Integration, Remote Migrations & Persistence Complete (Phase 05.6)
+**Implementation State:** Phases 01, 02, 03, 04, 05, 05.1, 05.2, 05.3, 05.4, 05.5, and 05.6 Complete (PostgreSQL Schema, Express REST API, Tenrai Metadata Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Import UI, JSON/CSV Export Endpoints, Hosted Supabase PostgreSQL 17.11 Persistence, Remote Idempotent Migrations, Strict Tenant Scoping, Schema-Aware Health Probes)
+**Next Phase:** Phase 06 Hardening: Security, Accessibility, & Performance (Pending user review and authorization; Phase 05.6 stop condition enforced)
 
 ---
 

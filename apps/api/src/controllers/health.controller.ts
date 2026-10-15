@@ -4,13 +4,18 @@ import { db } from '../repositories/db.js';
 export const healthController = {
   async getHealth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const isDbHealthy = await db.checkHealth();
-      const statusCode = isDbHealthy ? 200 : 503;
+      const dbHealth = await db.checkHealthDetailed();
+      const isHealthy = dbHealth.connected && dbHealth.schemaReady;
+      const statusCode = isHealthy ? 200 : 503;
 
       res.status(statusCode).json({
         data: {
-          status: isDbHealthy ? 'healthy' : 'degraded',
-          database: isDbHealthy ? 'connected' : 'disconnected',
+          status: isHealthy ? 'healthy' : 'degraded',
+          database: dbHealth.connected ? 'connected' : 'disconnected',
+          schema: dbHealth.schemaReady ? 'ready' : (dbHealth.connected ? 'incomplete' : 'unavailable'),
+          databaseTarget: dbHealth.target,
+          databaseHost: dbHealth.sanitizedHost,
+          tablesCount: dbHealth.tablesCount,
           version: '1.0.0',
           uptime: Math.round(process.uptime()),
         },
