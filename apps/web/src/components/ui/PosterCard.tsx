@@ -39,6 +39,7 @@ export function PosterCard({
   status,
   className = '',
 }: PosterCardProps) {
+  const [imgFailed, setImgFailed] = React.useState(false);
   const [from, to] = PLACEHOLDER_COLORS[mediaType];
   const initials = title.slice(0, 2).toUpperCase();
 
@@ -50,16 +51,14 @@ export function PosterCard({
     >
       {/* Cover image / placeholder */}
       <div className="poster-card-image-wrap">
-        {coverUrl ? (
+        {coverUrl && !imgFailed ? (
           <img
             src={coverUrl}
             alt=""
             className="poster-card-image"
             loading="lazy"
             decoding="async"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
+            onError={() => setImgFailed(true)}
           />
         ) : (
           <div

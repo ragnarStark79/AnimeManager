@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { Search, Bell, Plus, User } from 'lucide-react';
+import { AddTitleModal } from '../ui';
 import './Header.css';
 
 interface HeaderProps {
@@ -16,8 +17,20 @@ const HEADER_NAV_LINKS = [
 ];
 
 export function Header({ title }: HeaderProps) {
+  const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = searchValue.trim();
+    if (trimmed) {
+      navigate(`/titles?q=${encodeURIComponent(trimmed)}`);
+    } else {
+      navigate('/titles');
+    }
+  };
 
   return (
     <header className="header glass-header" role="banner">
@@ -45,51 +58,57 @@ export function Header({ title }: HeaderProps) {
 
         {/* Search bar */}
         <div className={['header-search', searchOpen ? 'header-search--open' : ''].join(' ').trim()}>
-          <div className="header-search-inner">
+          <form className="header-search-inner" onSubmit={handleSearchSubmit} role="search">
             <Search size={16} className="header-search-icon" aria-hidden="true" />
             <input
               id="global-search"
               type="search"
               className="header-search-input"
-              placeholder="Search titles, genres, tags…"
+              placeholder="Search sample catalog (press Enter)…"
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
-              aria-label="Search your library"
+              aria-label="Search sample catalog"
               onFocus={() => setSearchOpen(true)}
               onBlur={() => setSearchOpen(false)}
             />
-          </div>
+          </form>
         </div>
 
         {/* Right actions */}
         <div className="header-actions">
-          <Link
-            to="/titles/new"
+          <button
+            type="button"
             className="header-btn header-btn--primary"
             aria-label="Add a new title"
+            onClick={() => setAddOpen(true)}
           >
             <Plus size={16} aria-hidden="true" />
             <span className="header-btn-label">Add</span>
-          </Link>
+          </button>
 
           <button
             className="header-icon-btn"
-            aria-label="Notifications"
+            aria-label="Notifications (coming in Phase 05)"
+            title="Notifications (coming in Phase 05)"
             type="button"
+            disabled
           >
             <Bell size={18} aria-hidden="true" />
-            <span className="header-icon-btn-dot" aria-hidden="true" />
           </button>
 
-          <button
+          <NavLink
+            to="/settings"
             className="header-avatar"
-            aria-label="User account"
-            type="button"
+            aria-label="Settings & Preferences"
+            title="Settings & Preferences"
           >
             <User size={16} aria-hidden="true" />
-          </button>
+          </NavLink>
         </div>
       </div>
+
+      {/* Add Title modal preview */}
+      <AddTitleModal open={addOpen} onClose={() => setAddOpen(false)} />
     </header>
   );
 }

@@ -1,8 +1,8 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.4
-**Phase:** Phase 04 Part 1 (Visual Foundation, Design System & Application Shell)
-**Date:** 2026-10-14
+**Document Version:** 1.5
+**Phase:** Phase 04 Part 2 (Interactive Catalog UI, Search, Filters & Library Navigation)
+**Date:** 2026-10-15
 
 ---
 
@@ -16,19 +16,21 @@ During **Phase 02**, the Express REST backend was implemented with layered archi
 
 During **Phase 03**, the Jikan API v4 metadata importer and resilient adapter were implemented and thoroughly tested. The suite validates strict MyAnimeList URL parsing and adversarial SSRF prevention, resilient HTTP client behavior (bounded exponential backoff for 429/503, `Retry-After` header handling, timeouts, request throttling, and bounded TTL/LRU caching), metadata normalization (explicit manhwa classification, ambiguous type warnings, deduplication, and complete exclusion of community reviews), and atomic transactional commit enforcing server-side field selection and duplicate import prevention. All 64 API tests (unit and Supertest integration) and 5 shared schema tests passed with 100% success.
 
-During **Phase 04 Part 1**, the frontend visual foundation and application shell were implemented using Vite 5, React 18, TypeScript, and Vanilla CSS design tokens adhering closely to the user's supplied Flix.id-inspired glassmorphism reference image. The implementation delivers atmospheric blue-gray backgrounds, translucent glass panels with backdrop blur fallbacks, center pill navigation in the header, desktop sidebar navigation, responsive bottom mobile navigation, 8 reusable shared UI components, an elevated Dashboard featuring dual spotlight hero cards and a 6-column portrait poster grid, and placeholder pages for all primary routes (`/bookmarks`, `/my-list`, `/collections`, `/titles`, `/settings`, and `*` 404). A dedicated frontend automated test suite (`apps/web/test/`) was created and verified: all 11 unit tests pass, bringing total monorepo automated tests to 80/80 passing with 0 failures.
+During **Phase 04 Part 1**, the frontend visual foundation and application shell were implemented using Vite 5, React 18, TypeScript, and Vanilla CSS design tokens adhering closely to the user's supplied Flix.id-inspired glassmorphism reference image. The implementation delivers atmospheric blue-gray backgrounds, translucent glass panels with backdrop blur fallbacks, center pill navigation in the header, desktop sidebar navigation, responsive bottom mobile navigation, 8 reusable shared UI components, an elevated Dashboard featuring dual spotlight hero cards and a 6-column portrait poster grid, and placeholder pages for all primary routes. All 11 unit tests passed.
+
+During **Phase 04 Part 2**, the interactive catalog UI, search, filtering, and library navigation were implemented and verified. A typed demonstration dataset (`src/data/demo.ts`) with 12 balanced sample titles across anime, manga, and manhwa was established with pure filtering, search, sorting, and status-counting utilities. Reusable `FilterChips`, `SortControl`, and `AddTitleModal` components were added to the UI design system. `TitlesPage` was upgraded with real-time substring search, clear query button, media-type filter chips, 6 sort modes, empty-catalog and no-results states, and URL search parameter sync via `useSearchParams` (`?q=...`). `BookmarksPage` was upgraded with functional status filtering tabs (All, In Progress, Plan to Watch, Completed, On Hold, Dropped), dynamic item counts, and per-status empty states. `MyListPage` and `CollectionsPage` headings and semantics were clarified. `Dashboard` showcase filtering by category/top-rated/planning was wired. `Header` search was connected to navigate to `/titles?q=...`, the `Add` button was wired to open the preview modal, and broken links were eliminated. `PosterCard` image fallback was enhanced with `imgFailed` state. An automated test suite (`apps/web/test/interactive-catalog.test.js`) verifies all 10 required catalog behaviors. All 21 frontend tests pass cleanly, bringing total monorepo automated tests to 90/90 passing with 0 failures.
 
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01, 02, 03, & 04 Part 1)
+## 2. Quality Gate Verification Matrix (Phases 01, 02, 03, & 04 Part 2)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces (shared, api, web) | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 64 API + 11 web tests pass (80 total) | **PASS** |
-| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, and router | 11/11 frontend assertions pass cleanly | **PASS** |
+| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 64 API + 21 web tests pass (90 total) | **PASS** |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, and router | 21/21 frontend assertions pass cleanly | **PASS** |
 | **API Integration Tests**| `npm run test:api` | Node test runner executes integration & importer suites | 64/64 test assertions passed cleanly | **PASS** |
 | **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions and Vite client bundle | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
@@ -279,6 +281,44 @@ $ npm --prefix apps/web test
 ℹ duration_ms 145.854459
 ```
 
+### 3.6 Phase 04 Part 2 Interactive Catalog Test Suite (`npm --prefix apps/web test`)
+```shell
+$ npm --prefix apps/web test
+
+> @animemanager/web@1.0.0 test
+> node --test test/**/*.test.js
+
+✔ Shared UI Components: index.ts exports all 8 required design system components (0.9625ms)
+✔ PosterCard: verifies aspect ratio, fallback support, and rating presentation (1.098ms)
+✔ Input: accessible form control with label and aria bindings (0.312125ms)
+✔ EmptyState & LoadingState: accessible status containers (1.043917ms)
+✔ Design Tokens: tokens.css defines all required Flix.id design tokens (0.975584ms)
+✔ Glassmorphism: glassmorphism.css provides backdrop filter utilities and fallback (1.27675ms)
+✔ Global Styles: global.css imports design system and sets atmospheric background (0.379041ms)
+✔ 1. Search Filtering: Filters accurately by english title, original title, and genre (0.784667ms)
+✔ 2. Clearing Search: Empty or whitespace query returns the complete dataset (0.114541ms)
+✔ 3. No-Results State: Zero matches produce empty results with EmptyState in UI (0.070625ms)
+✔ 4. Media-Type Filtering: Separates anime, manga, and manhwa accurately (0.090375ms)
+✔ 5. Sorting: Correctly orders records by title, rating, and year (14.058041ms)
+✔ 6. Bookmark Status Filtering: Accurately filters and tallies statuses (0.1585ms)
+✔ 7. Empty-State Rendering: Pages render EmptyState for zero records (0.066542ms)
+✔ 8. Poster Fallback: PosterCard provides img onError fallback to avoid broken image icons (0.05025ms)
+✔ 9. Valid Navigation: All navigation links in Header, Sidebar, and AppShell lead to registered routes (0.112625ms)
+✔ 10. Honest Preview-Only Add Title Behavior: Modal is marked as preview and does not claim persistence (0.1115ms)
+✔ Router Configuration: All required Phase 04 Part 1 routes are registered (0.641292ms)
+✔ Navigation Scope: Sidebar contains only approved primary destinations and omits Import (0.865333ms)
+✔ AppShell: Page titles map all destinations including Collections (0.31475ms)
+✔ Dashboard: Implements dual spotlight cards and navigation to all primary sections (0.446ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161.61825
+```
+
 ---
 
 ## 4. Planned Testing Matrix (Phases 01–07)
@@ -286,7 +326,7 @@ $ npm --prefix apps/web test
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
-    Comp[Component Tests<br/>Node test runner / 11 Passed - Phase 04 Part 1 PASSED]
+    Comp[Component & Catalog Tests<br/>Node test runner / 21 Passed - Phase 04 Part 2 PASSED]
     Int[API Integration Tests<br/>Supertest / 64 Passed - Phase 02 & 03 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
@@ -302,7 +342,7 @@ graph TD
 - [x] **Phase 02: API Integration Tests (Supertest):** 35/35 PASSED (Titles, Collections, Bookmarks, Health, Auth, Cross-Owner Isolation, Confirmation, Error envelopes).
 - [x] **Phase 03: Jikan Provider Adapter & Importer Suite:** 64/64 PASSED (URL parsing, SSRF defense, client resilience, 429 backoff, Retry-After, caching, throttling, normalization, manhwa disambiguation, review exclusion, duplicate detection, atomic commit, and manual creation decoupling).
 - [x] **Phase 04 Part 1: Visual Foundation & Design System Tests:** 11/11 PASSED (Design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, AppShell title mapping, and Dashboard spotlight & filter pills).
-- [ ] **Phase 04 Part 2: Interactive Catalog & Filtering QA:** Deep search filtering, title card interactive grids, collections overview, bookmark status transitions.
+- [x] **Phase 04 Part 2: Interactive Catalog & Filtering QA:** 21/21 PASSED (Search filtering, clearing query, no-results state, media type filtering, sorting, bookmark status filtering, empty states, poster fallbacks, valid navigation, and honest Add Title preview behavior).
 - [ ] **Phase 05: Core User Journeys E2E (Playwright):** Journeys A through E end-to-end in browser.
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
 - [ ] **Phase 07: Production Smoke Tests:** Health, login, title/collection/bookmark management on production deployment.

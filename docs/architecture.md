@@ -1,8 +1,8 @@
 # AnimeManager — System Architecture
 
-**Document Version:** 1.3
-**Status:** Frontend Foundation & Application Shell Implemented (Phase 04 Part 1)
-**Implementation State:** Phase 01, Phase 02, Phase 03, & Phase 04 Part 1 Complete (Database, Express API, Jikan Adapter, React Vite Glassmorphism Shell)
+**Document Version:** 1.4
+**Status:** Interactive Catalog UI, Search, Filters & Navigation Implemented (Phase 04 Part 2)
+**Implementation State:** Phase 01, Phase 02, Phase 03, Phase 04 Part 1, & Phase 04 Part 2 Complete (Database, Express API, Jikan Adapter, React Vite Glassmorphism Shell, Interactive Catalog UI)
 
 
 ---
@@ -267,22 +267,39 @@ graph LR
 ### Technology Stack:
 - **Core:** React 18+, Vite, TypeScript.
 - **Routing:** React Router v6+.
-- **State & Caching:** TanStack Query (React Query) for server state; local React state for UI interactions.
+- **State & Caching:** TanStack Query (React Query) for server state (Phase 05); local React state with URL search parameter synchronization (`useSearchParams`) for catalog filtering and search.
 - **Forms & Validation:** React Hook Form with `@hookform/resolvers/zod`.
 - **Icons:** Lucide React.
 - **Styling:** Vanilla CSS with design tokens and CSS custom properties (glassmorphism tokens, backdrop filters, translucent surfaces, and accessibility contrast fallbacks).
 
+### Key Components & Catalog Architecture (Phase 04 Part 2):
+1. **Demonstration Dataset (`apps/web/src/data/demo.ts`):**
+   - Single source of truth for demonstration records prior to Phase 05 API integration.
+   - Contains 12 typed sample records (`DEMO_TITLES`) balanced evenly across anime (4), manga (4), and manhwa (4), with stable identifiers (`demo-*`), ratings, release years, genres, and bookmark statuses.
+   - Decoupled from backend persistence: purely functional query utilities (`searchTitles`, `filterByMediaType`, `filterByBookmarkStatus`, `sortTitles`, `countByStatus`).
+2. **Interactive UI Components (`apps/web/src/components/ui/`):**
+   - `FilterChips`: Accessible pill-shaped filter controls using radiogroup/radio ARIA bindings, active state glow, count badges, and horizontal touch scrolling.
+   - `SortControl`: Accessible custom sort component combining a styled glassmorphic trigger with an overlay native `<select>` element for seamless keyboard and screen-reader accessibility.
+   - `AddTitleModal`: Non-persistent preview dialog demonstrating the planned manual entry form with clear Phase 05 preview disclosures, disabled submit button ("Save Title (Phase 05)"), and native dialog focus management.
+   - `PosterCard`: Enforces 2:3 aspect ratio, displays title, media badge, rating, and status label. Features `imgFailed` state fallback rendering a styled gradient with title initials when cover images fail to load.
+3. **Search & URL Synchronization:**
+   - Global header search form in `Header.tsx` navigates to `/titles?q=${query}` upon submission.
+   - `TitlesPage.tsx` synchronizes query state with `useSearchParams`, providing real-time substring search, instant clear button, media-type filtering, multi-facet sorting, and empty/no-results states.
+4. **Tracking & Collection Boundaries:**
+   - `BookmarksPage.tsx` provides functional status tabs (`consuming`, `plan_to_consume`, `completed`, `on_hold`, `dropped`) with live count tallies and per-status empty states.
+   - `MyListPage.tsx` is clearly defined as the user's organizational system (folders and multi-collection memberships).
+   - `CollectionsPage.tsx` manages thematic curations with starter theme inspiration and a non-persistent preview modal.
+
 ### Key Pages & Navigation:
 - **Primary Routes:**
-  - `/` — Library Dashboard (Quick stats, recently updated bookmarks, recent additions, collection shortcuts).
-  - `/my-list` — Collections Overview (Grid of user-created folders).
-  - `/collections/:collectionId` — Collection View (Titles belonging to this collection with custom sorting).
-  - `/bookmarks` — Bookmarks Tracker (Status tabs: Plan to Watch/Read, In Progress, Completed, On Hold, Dropped).
-  - `/titles/new` — Add Title Selector (Manual Entry or Import).
-  - `/titles/import` — Jikan Importer (URL, MAL ID, Search with interactive preview & field selector).
-  - `/titles/:titleId` — Title Details (Full metadata, cover artwork, bookmarks editor, collections manager, external links).
-  - `/titles/:titleId/edit` — Edit Title.
-  - `/settings` — Preferences, JSON/CSV export, health status.
+  - `/` — Library Dashboard (Quick stats, spotlight hero cards, category-filtered showcase, library navigation shortcuts).
+  - `/titles` — Complete Title Catalog (Interactive search, media filters, sorting controls, responsive poster grid).
+  - `/bookmarks` — Bookmarks Tracker (Status tabs: All, In Progress, Plan to Watch, Completed, On Hold, Dropped).
+  - `/my-list` — My List Overview (Folder and collection organization).
+  - `/collections` — Custom Thematic Collections (Curated groupings and theme ideas).
+  - `/import` — Jikan Importer UI (Search MyAnimeList and import preview).
+  - `/settings` — Preferences, JSON/CSV export, health status (Phase 05 disclosures).
+  - `*` — NotFoundPage (404 error page).
 
 ---
 

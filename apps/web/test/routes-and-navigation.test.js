@@ -55,7 +55,7 @@ test('Dashboard: Implements dual spotlight cards and navigation to all primary s
 
   assert.ok(dashboardCode.includes('spotlight-card--anime'), 'Dashboard must include anime spotlight card');
   assert.ok(dashboardCode.includes('spotlight-card--manhwa'), 'Dashboard must include manhwa spotlight card');
-  assert.ok(dashboardCode.includes('filter-pill'), 'Dashboard must include filter pills row');
+  assert.ok(dashboardCode.includes('dashboard-filter-section') || dashboardCode.includes('FilterChips'), 'Dashboard must include filter chips row');
   assert.ok(dashboardCode.includes('/bookmarks'), 'Dashboard must link to Bookmarks');
   assert.ok(dashboardCode.includes('/my-list'), 'Dashboard must link to My List');
   assert.ok(dashboardCode.includes('/collections'), 'Dashboard must link to Collections');

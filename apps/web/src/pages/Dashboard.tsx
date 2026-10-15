@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BookOpen,
@@ -9,42 +9,65 @@ import {
   ArrowRight,
   Plus,
   Zap,
-  Play,
   Flame,
   Clock,
   Sparkles,
   Clapperboard,
-  SlidersHorizontal,
+  Info,
+  type LucideIcon,
 } from 'lucide-react';
-import { GlassCard, PosterCard, Badge } from '../components/ui';
+import { GlassCard, PosterCard, Badge, AddTitleModal, FilterChips } from '../components/ui';
+import {
+  DEMO_TITLES,
+  filterByMediaType,
+  type MediaType,
+} from '../data/demo';
 import './Dashboard.css';
 
-/* ── Representative starter library posters ── */
-const FEATURED_POSTERS = [
-  { titleId: 'fma-brotherhood',  title: 'Fullmetal Alchemist: Brotherhood', mediaType: 'anime'  as const, year: 2009, rating: 9.1 },
-  { titleId: 'vagabond',          title: 'Vagabond',                         mediaType: 'manga'  as const, year: 1998, rating: 9.3 },
-  { titleId: 'solo-leveling',     title: 'Solo Leveling',                    mediaType: 'manhwa' as const, year: 2018, rating: 8.9 },
-  { titleId: 'evangelion',        title: 'Neon Genesis Evangelion',          mediaType: 'anime'  as const, year: 1995, rating: 8.5 },
-  { titleId: 'berserk',           title: 'Berserk',                          mediaType: 'manga'  as const, year: 1989, rating: 9.4 },
-  { titleId: 'tower-of-god',      title: 'Tower of God',                     mediaType: 'manhwa' as const, year: 2010, rating: 8.3 },
+/* ── Category filter options (matching reference image aesthetic) ── */
+type DashboardFilter = 'all' | MediaType | 'trending' | 'planning';
+
+const FILTER_OPTIONS: { value: DashboardFilter; label: string; icon: LucideIcon }[] = [
+  { value: 'all',      label: 'All Titles',    icon: Sparkles },
+  { value: 'anime',    label: 'Anime',         icon: Clapperboard },
+  { value: 'manga',    label: 'Manga',         icon: BookOpen },
+  { value: 'manhwa',   label: 'Manhwa',        icon: Zap },
+  { value: 'trending', label: 'Top Rated',     icon: Flame },
+  { value: 'planning', label: 'Plan to Watch', icon: Clock },
 ];
 
-/* ── Filter pills inspired by reference ── */
-const FILTER_PILLS = [
-  { id: 'all',      label: 'All Titles',   icon: Sparkles },
-  { id: 'anime',    label: 'Anime',        icon: Clapperboard },
-  { id: 'manga',    label: 'Manga',        icon: BookOpen },
-  { id: 'manhwa',   label: 'Manhwa',       icon: Zap },
-  { id: 'trending', label: 'Trending',     icon: Flame },
-  { id: 'planning', label: 'Plan to Watch',icon: Clock },
-];
+/* ─────────────────────────────────────────────────────────── */
 
 export function Dashboard() {
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState<DashboardFilter>('all');
+  const [addOpen, setAddOpen] = useState(false);
 
-  const filteredPosters = activeFilter === 'all' || activeFilter === 'trending' || activeFilter === 'planning'
-    ? FEATURED_POSTERS
-    : FEATURED_POSTERS.filter((p) => p.mediaType === activeFilter);
+  const filterOptions = FILTER_OPTIONS.map((opt) => ({
+    value: opt.value,
+    label: opt.label,
+    icon: <opt.icon size={14} />,
+  }));
+
+  const filteredPosters = useMemo(() => {
+    switch (activeFilter) {
+      case 'all':
+        return DEMO_TITLES.slice(0, 6);
+      case 'trending':
+        return [...DEMO_TITLES].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 6);
+      case 'planning':
+        return DEMO_TITLES.filter((t) => t.bookmarkStatus === 'plan_to_consume').slice(0, 6);
+      default:
+        return filterByMediaType(DEMO_TITLES, activeFilter as MediaType).slice(0, 6);
+    }
+  }, [activeFilter]);
+
+  const sectionTitle =
+    activeFilter === 'anime'    ? 'Anime in Sample Catalog' :
+    activeFilter === 'manga'    ? 'Manga in Sample Catalog' :
+    activeFilter === 'manhwa'   ? 'Manhwa in Sample Catalog' :
+    activeFilter === 'trending' ? 'Top Rated (Sample Catalog)' :
+    activeFilter === 'planning' ? 'Plan to Watch (Sample Catalog)' :
+    'Sample Catalog';
 
   return (
     <div className="dashboard">
@@ -58,10 +81,14 @@ export function Dashboard() {
           </p>
         </div>
         <div className="dashboard-header-actions">
-          <Link to="/titles/new" className="btn btn--primary btn--md">
+          <button
+            type="button"
+            className="btn btn--primary btn--md"
+            onClick={() => setAddOpen(true)}
+          >
             <Plus size={15} aria-hidden="true" />
             <span>Add Title</span>
-          </Link>
+          </button>
           <Link to="/import" className="btn btn--secondary btn--md">
             <Zap size={15} aria-hidden="true" />
             <span>Import from MAL</span>
@@ -75,7 +102,7 @@ export function Dashboard() {
         <div className="spotlight-card spotlight-card--anime">
           <div className="spotlight-card-content">
             <div className="spotlight-badge-row">
-              <Badge variant="anime" size="sm">Featured Anime</Badge>
+              <Badge variant="anime" size="sm">Sample: Anime</Badge>
               <span className="spotlight-rating">
                 <Star size={12} fill="currentColor" aria-hidden="true" />
                 9.1
@@ -83,12 +110,12 @@ export function Dashboard() {
             </div>
             <h2 className="spotlight-title">Fullmetal Alchemist: Brotherhood</h2>
             <p className="spotlight-desc">
-              Two brothers search for the Philosopher’s Stone after an attempt at human alchemy goes disastrously wrong.
+              Two brothers search for the Philosopher's Stone after an attempt at human alchemy goes disastrously wrong.
             </p>
             <div className="spotlight-actions">
-              <Link to="/titles/fma-brotherhood" className="spotlight-btn spotlight-btn--play">
-                <Play size={14} fill="currentColor" aria-hidden="true" />
-                <span>Resume Series</span>
+              <Link to="/titles" className="spotlight-btn spotlight-btn--play">
+                <BookOpen size={14} aria-hidden="true" />
+                <span>View in Catalog</span>
               </Link>
               <Link to="/bookmarks" className="spotlight-btn spotlight-btn--glass">
                 <Bookmark size={14} aria-hidden="true" />
@@ -106,20 +133,20 @@ export function Dashboard() {
         <div className="spotlight-card spotlight-card--manhwa">
           <div className="spotlight-card-content">
             <div className="spotlight-badge-row">
-              <Badge variant="manhwa" size="sm">Featured Manhwa</Badge>
+              <Badge variant="manhwa" size="sm">Sample: Manhwa</Badge>
               <span className="spotlight-rating">
                 <Star size={12} fill="currentColor" aria-hidden="true" />
                 8.9
               </span>
             </div>
-            <h2 className="spotlight-title">Solo Leveling: Shadow Monarch</h2>
+            <h2 className="spotlight-title">Solo Leveling</h2>
             <p className="spotlight-desc">
               Sung Jin-woo rises from the weakest E-rank hunter to humanity's greatest hope after discovering a hidden quest.
             </p>
             <div className="spotlight-actions">
-              <Link to="/titles/solo-leveling" className="spotlight-btn spotlight-btn--play">
-                <Play size={14} fill="currentColor" aria-hidden="true" />
-                <span>Continue Reading</span>
+              <Link to="/titles" className="spotlight-btn spotlight-btn--play">
+                <BookOpen size={14} aria-hidden="true" />
+                <span>View in Catalog</span>
               </Link>
               <Link to="/collections" className="spotlight-btn spotlight-btn--glass">
                 <FolderKanban size={14} aria-hidden="true" />
@@ -134,30 +161,27 @@ export function Dashboard() {
         </div>
       </section>
 
-      {/* ── Category Filter Pills Row (Reference Image Aesthetic) ── */}
+      {/* ── Category Filter Pills Row ── */}
       <section className="dashboard-filter-section" aria-label="Media category filters">
-        <div className="filter-pills-container" role="tablist">
-          {FILTER_PILLS.map((pill) => {
-            const Icon = pill.icon;
-            const isActive = activeFilter === pill.id;
-            return (
-              <button
-                key={pill.id}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                className={['filter-pill', isActive ? 'filter-pill--active' : ''].filter(Boolean).join(' ')}
-                onClick={() => setActiveFilter(pill.id)}
-              >
-                <Icon size={14} className="filter-pill-icon" aria-hidden="true" />
-                <span>{pill.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <FilterChips
+          options={filterOptions}
+          value={activeFilter}
+          onChange={setActiveFilter}
+          label="Filter catalog by category"
+          className="filter-chips--scroll"
+        />
       </section>
 
-      {/* ── Trending & Catalog Poster Grid (Reference Image Layout) ── */}
+      {/* ── Demo notice ── */}
+      <div className="dashboard-demo-notice" role="note">
+        <Info size={13} aria-hidden="true" />
+        <span>
+          <strong>Sample catalog</strong> — The titles below are demonstration data.
+          Your real library will appear here after backend connection in Phase 05.
+        </span>
+      </div>
+
+      {/* ── Catalog Poster Grid ── */}
       <section className="dashboard-section" aria-labelledby="trending-heading">
         <div className="dashboard-section-header">
           <div>
@@ -166,16 +190,10 @@ export function Dashboard() {
               <span>Catalog Showcase</span>
             </div>
             <h2 id="trending-heading" className="dashboard-section-title">
-              {activeFilter === 'anime' ? 'Trending in Anime' :
-               activeFilter === 'manga' ? 'Trending in Manga' :
-               activeFilter === 'manhwa' ? 'Trending in Manhwa' :
-               'Trending in Library'}
+              {sectionTitle}
             </h2>
           </div>
           <div className="dashboard-section-actions">
-            <button className="dashboard-icon-pill" type="button" aria-label="Sort and filter options">
-              <SlidersHorizontal size={14} aria-hidden="true" />
-            </button>
             <Link to="/titles" className="dashboard-see-all">
               <span>View all catalog</span>
               <ArrowRight size={14} aria-hidden="true" />
@@ -183,18 +201,34 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="dashboard-poster-grid">
-          {filteredPosters.map((item) => (
-            <PosterCard
-              key={item.titleId}
-              titleId={item.titleId}
-              title={item.title}
-              mediaType={item.mediaType}
-              year={item.year}
-              rating={item.rating}
-            />
-          ))}
-        </div>
+        {filteredPosters.length > 0 ? (
+          <div className="dashboard-poster-grid">
+            {filteredPosters.map((item) => (
+              <PosterCard
+                key={item.titleId}
+                titleId={item.titleId}
+                title={item.title}
+                mediaType={item.mediaType}
+                coverUrl={item.coverUrl}
+                year={item.year}
+                rating={item.rating}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="dashboard-empty-filter">
+            <p className="dashboard-empty-filter-msg">
+              No sample titles in this category.
+            </p>
+            <button
+              type="button"
+              className="btn btn--secondary btn--md"
+              onClick={() => setActiveFilter('all')}
+            >
+              Show All
+            </button>
+          </div>
+        )}
       </section>
 
       {/* ── Overview & Navigation Cards ── */}
@@ -207,7 +241,7 @@ export function Dashboard() {
             <div className="dashboard-nav-card-content">
               <h3 className="dashboard-nav-card-title">Bookmarks & Progress</h3>
               <p className="dashboard-nav-card-sub">
-                Track status across Consuming, Plan to Watch, Completed, and On Hold.
+                Track status across In Progress, Plan to Watch, Completed, and On Hold.
               </p>
             </div>
             <ArrowRight size={16} className="dashboard-nav-card-arrow" aria-hidden="true" />
@@ -240,6 +274,9 @@ export function Dashboard() {
           </Link>
         </div>
       </section>
+
+      {/* ── Add Title Modal ── */}
+      <AddTitleModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }

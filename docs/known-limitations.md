@@ -69,9 +69,11 @@
    - When the backend connects via a privileged PostgreSQL connection (or Supabase service role), PostgreSQL table-level RLS policies are bypassed by the privileged role.
    - **Mitigation & Enforcement:** Backend service-layer authorization is strictly mandatory. All database queries in the repository layer enforce `owner_id = $x` in both reads and writes. Cross-owner references (e.g. attaching a title belonging to another user to one's own collection or bookmark) are blocked by explicit ownership validation queries before writes occur. In automated integration tests, attempts by Owner B to access or manipulate Owner A's records return 404 or 403.
 
-2. **Phase 04 Part 1 Scope Boundaries:**
-   - The visual foundation, design tokens (`tokens.css`), glassmorphism utilities (`glassmorphism.css`), application shell, header with center pill navigation, sidebar, mobile navigation, 8 shared UI components, Dashboard with spotlight cards & 6-poster grid, and route placeholders (`/bookmarks`, `/my-list`, `/collections`, `/titles`, `/settings`, `*`) are fully established and verified.
-   - Live backend API connectivity (connecting UI forms and cards to Express REST endpoints via fetch/React Query) and real database mutations are strictly scoped for Phase 05.
-   - Deep catalog filtering, multi-facet sorting controls, and title detail dialogs belong to Phase 04 Part 2.
+2. **Phase 04 Part 2 Scope & Demonstration Data Boundaries:**
+   - **Demo Dataset Scope:** The catalog records displayed on the Dashboard, Titles page, and Bookmarks page originate from the typed demonstration dataset (`src/data/demo.ts`, 12 items: 4 anime, 4 manga, 4 manhwa). These sample records are strictly isolated in memory and do not represent actual persisted user records.
+   - **Preview-Only Forms:** The `AddTitleModal` dialog and `CollectionsPage` new collection dialog are UI-only preview forms. They explicitly declare that data is not persisted to the database in Phase 04 and their submission actions are disabled or non-persistent.
+   - **Header & Global Search Scope:** The global header search form submits queries to `/titles?q=...` to filter the demonstration dataset. Real backend search queries across the user's PostgreSQL database will be wired in Phase 05.
+   - **External Image Availability:** If external cover artwork URLs fail to load, `PosterCard` catches `onError` events and renders styled gradient placeholder cards with title initials.
+   - **Full CRUD & API Integration:** Wiring React components to Express REST endpoints via TanStack Query/fetch, full database mutations, cover image uploads, and Jikan import workflows are strictly scheduled for Phase 05.
 
 

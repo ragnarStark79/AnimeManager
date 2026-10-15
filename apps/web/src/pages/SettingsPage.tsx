@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Info } from 'lucide-react';
 import { GlassCard } from '../components/ui';
 import './Placeholder.css';
 
@@ -8,19 +8,30 @@ const SETTINGS_SECTIONS = [
     id: 'general',
     title: 'General',
     description: 'Application preferences and display settings.',
-    items: ['Appearance', 'Language', 'Date format'],
+    items: [
+      { name: 'Appearance (Dark / Light / System)', status: 'Phase 05' },
+      { name: 'Language and locale', status: 'Phase 05' },
+      { name: 'Date format preference', status: 'Phase 05' },
+    ],
   },
   {
     id: 'data',
     title: 'Data & Export',
-    description: 'Export your library data or manage storage.',
-    items: ['Export as JSON', 'Export as CSV', 'Clear cache'],
+    description: 'Export your library data or manage local storage.',
+    items: [
+      { name: 'Export library as JSON', status: 'Phase 05' },
+      { name: 'Export library as CSV', status: 'Phase 05' },
+      { name: 'Clear local application cache', status: 'Phase 05' },
+    ],
   },
   {
-    id: 'api',
+    id: 'connections',
     title: 'Connections',
-    description: 'API keys, external service configurations.',
-    items: ['Backend health check', 'MAL connection status'],
+    description: 'External service status and backend connection information.',
+    items: [
+      { name: 'Backend API status', status: 'Phase 05' },
+      { name: 'MyAnimeList (Jikan) connection', status: 'Phase 05' },
+    ],
   },
 ];
 
@@ -29,10 +40,24 @@ export function SettingsPage() {
     <div className="placeholder-page">
       <div className="placeholder-page-header">
         <div>
-          <p className="placeholder-eyebrow"><Settings size={13} /> Settings</p>
+          <p className="placeholder-eyebrow">
+            <Settings size={13} aria-hidden="true" /> Settings
+          </p>
           <h1 className="placeholder-title">Settings</h1>
-          <p className="placeholder-sub">Preferences, data management, and application configuration.</p>
+          <p className="placeholder-sub">
+            Preferences, data management, and application configuration.
+          </p>
         </div>
+      </div>
+
+      {/* Notice */}
+      <div className="titles-demo-notice" role="note">
+        <Info size={14} aria-hidden="true" />
+        <span>
+          All settings features are planned for <strong>Phase 05</strong>. No
+          options are functional in this phase — the panels below show the intended
+          interface layout only.
+        </span>
       </div>
 
       <div className="settings-grid">
@@ -42,9 +67,9 @@ export function SettingsPage() {
             <p className="settings-section-desc">{section.description}</p>
             <ul className="settings-items" role="list">
               {section.items.map((item) => (
-                <li key={item} className="settings-item">
-                  <span>{item}</span>
-                  <span className="settings-item-badge">Coming in Phase 05</span>
+                <li key={item.name} className="settings-item">
+                  <span>{item.name}</span>
+                  <span className="settings-item-badge">Coming in {item.status}</span>
                 </li>
               ))}
             </ul>
