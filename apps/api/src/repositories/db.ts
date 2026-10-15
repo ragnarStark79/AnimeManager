@@ -41,7 +41,9 @@ export const db = {
     try {
       const res = await pool.query('SELECT 1 as healthy');
       return res.rows.length === 1 && res.rows[0].healthy === 1;
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[AnimeManager DB] Health check failed: ${msg}`);
       return false;
     }
   },

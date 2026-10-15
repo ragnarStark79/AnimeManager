@@ -1,4 +1,38 @@
 import { z } from 'zod';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+function tryLoadEnv(): void {
+  const candidatePaths = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../../.env'),
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../.env'),
+  ];
+
+  for (const envPath of candidatePaths) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const content = fs.readFileSync(envPath, 'utf8');
+        for (const line of content.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const idx = trimmed.indexOf('=');
+          if (idx !== -1) {
+            const key = trimmed.slice(0, idx).trim();
+            const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+            if (!(key in process.env)) {
+              process.env[key] = val;
+            }
+          }
+        }
+        break;
+      } catch {
+        // Fall back to existing process.env
+      }
+    }
+  }
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -19,10 +53,12 @@ const envSchema = z.object({
 });
 
 function loadConfig() {
+  tryLoadEnv();
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
-    const missingKeys = result.error.errors.map((e) => e.path.join('.')).join(', ');
-    throw new Error(`[Config Error] Invalid or missing environment configuration: ${missingKeys}`);
+    const missingKeys = result.error.errors.map((e) => `  - ${e.path.join('.')}: ${e.message}`).join('\n');
+    console.error(`\n[Config Error] Invalid or missing environment configuration:\n${missingKeys}\n`);
+    throw new Error(`[Config Error] Invalid or missing environment configuration: ${result.error.errors.map((e) => e.path.join('.')).join(', ')}`);
   }
   return result.data;
 }

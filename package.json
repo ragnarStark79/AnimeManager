@@ -12,6 +12,10 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "healthcheck": "node scripts/healthcheck.js",
     "build": "npm run --workspaces --if-present build",
     "typecheck": "npm run --workspaces --if-present typecheck",
     "lint": "npm run --workspaces --if-present lint",

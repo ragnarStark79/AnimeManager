@@ -1,8 +1,8 @@
 # AnimeManager — System Architecture
 
-**Document Version:** 1.6
-**Status:** Full-Stack Integration & Core Library Workflows Complete (Phase 05)
-**Implementation State:** Phases 01, 02, 03, 04, and 05 Complete (PostgreSQL Schema, Express REST API, Resilient Jikan Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Jikan Import UI, JSON/CSV Export Endpoints & Triggers)
+**Document Version:** 1.7
+**Status:** Local Startup, API Connectivity & Runtime Architecture Complete (Phase 05.1)
+**Implementation State:** Phases 01, 02, 03, 04, 05, and 05.1 Complete (PostgreSQL Schema, Express REST API, Resilient Jikan Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Jikan Import UI, JSON/CSV Export Endpoints, Concurrent Development Runner, Healthcheck Suite)
 **Next Phase:** Phase 06 Hardening: Security, Accessibility, & Performance (Pending user review and authorization)
 
 ---
@@ -345,3 +345,22 @@ To eliminate Server-Side Request Forgery (SSRF) vulnerabilities, the application
   - Allowed MIME types: `image/jpeg`, `image/png`, `image/webp`.
   - Upload paths are generated server-side using UUIDs (`/covers/{owner_id}/{title_id}_{uuid}.webp`) to prevent path traversal.
   - Image fallback component displays a styled glassmorphic placeholder when no image exists or if an external image fails to load.
+
+---
+
+## 8. Local Development & Runtime Proxy Architecture
+
+During local development, the full-stack architecture is orchestrated through a single unified process runner (`scripts/dev.js` via `npm run dev`):
+
+```mermaid
+graph LR
+    Browser["Browser Client<br/>http://localhost:5173"] -->|"/api/v1/*"| ViteProxy["Vite Dev Server Proxy<br/>Port 5173"]
+    ViteProxy -->|"Proxy to http://127.0.0.1:4000"| Express["Express REST API<br/>Port 4000 (0.0.0.0)"]
+    Express -->|"TCP 5432"| PostgreSQL[("PostgreSQL 15+<br/>animemanager_test")]
+```
+
+### Architectural Safeguards:
+1. **IPv4 Loopback Alignment:** The Vite development server explicitly targets `http://127.0.0.1:4000` rather than `http://localhost:4000` to avoid IPv6 loopback lookup delays (`::1` vs `127.0.0.1`) that can cause transient `ECONNREFUSED` errors on macOS.
+2. **Unified Development Runner:** `scripts/dev.js` coordinates both the Express API and Vite frontend child processes with prefixed logging (`[api]` and `[web]`), graceful termination traps (`SIGINT`/`SIGTERM`), and port availability pre-flight checks.
+3. **Multi-Stage Healthcheck:** `scripts/healthcheck.js` (`npm run healthcheck`) provides actionable verification separating process reachability, PostgreSQL connection status, and Vite proxy forwarding.
+4. **Environment Encapsulation:** Client-side bundles are strictly prevented from accessing server-side database connection strings and signing keys; all backend requests from the browser route transparently through the relative `/api/v1` path.

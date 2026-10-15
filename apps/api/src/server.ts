@@ -2,8 +2,13 @@ import { app } from './app.js';
 import { config } from './config/index.js';
 import { pool } from './repositories/db.js';
 
-const server = app.listen(config.PORT, () => {
-  console.log(`[AnimeManager API] Server listening on port ${config.PORT} (env: ${config.NODE_ENV})`);
+const server = app.listen(config.PORT, '0.0.0.0', () => {
+  console.log(`[AnimeManager API] Server listening on http://localhost:${config.PORT} (env: ${config.NODE_ENV})`);
+  pool.query('SELECT 1').then(() => {
+    console.log('[AnimeManager API] Database connection verified successfully (connected).');
+  }).catch((err) => {
+    console.warn(`[AnimeManager API] WARNING: Database connection failed (${err.message}). API operating in degraded state.`);
+  });
 });
 
 const gracefulShutdown = async (signal: string) => {

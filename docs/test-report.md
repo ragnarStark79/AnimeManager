@@ -1,7 +1,7 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.7
-**Phase:** Phase 05 (Full-Stack Integration & Core Library Workflows)
+**Document Version:** 1.8
+**Phase:** Phase 05.1 (Local Startup, API Connectivity & Runtime Verification)
 **Date:** 2026-10-15
 
 ---
@@ -27,6 +27,11 @@ During **Phase 05**, full-stack integration and persistent core library workflow
 - **Jikan Import Workflow:** Connected `ImportPage` to `/api/v1/import/jikan/search`, `/preview`, and `/commit` with candidate selection, metadata preview, editable fields, duplicate MAL import warning banners, manga vs manhwa disambiguation, and atomic commit navigation to `/titles/:id`.
 - **JSON & CSV Library Export:** Implemented streaming export endpoints in Express (`apps/api/src/routes/export.routes.ts`, `controllers/export.controller.ts`, `services/export.service.ts`) and download triggers in `SettingsPage`, strictly scoped to the requesting owner.
 - **Automated Verification:** Added `apps/web/test/phase05-workflows.test.js` (8 tests) and `apps/api/test/export.test.js` (4 tests). Total monorepo tests increased to 113/113 passing (5 shared + 68 API + 40 web).
+
+During **Phase 05.1**, local development startup and API proxy connectivity were stabilized and verified:
+- **Root Cause Resolution:** Diagnosed the `ECONNREFUSED` / HTTP 500 error: the Express backend process was never started when running `npm run dev` in `apps/web` alone, and macOS IPv6/IPv4 loopback resolution differences (`::1` vs `127.0.0.1`) caused connection refusals.
+- **Unified Startup:** Created `scripts/dev.js` (`npm run dev`) to compile API TypeScript and concurrently spawn Express API (port 4000) and Vite frontend (port 5173) with formatted terminal labels (`[api]`, `[web]`), graceful shutdown (`SIGINT`/`SIGTERM`), and port collision checks.
+- **Healthcheck & Connectivity Verification:** Created `scripts/healthcheck.js` (`npm run healthcheck`) to verify direct API health, PostgreSQL database connection readiness, and Vite proxy forwarding. Verified real HTTP requests across `/api/v1/health`, authenticated `/api/v1/titles`, `/collections`, and `/bookmarks`. All 113 automated tests pass cleanly.
 
 ---
 
@@ -340,13 +345,54 @@ $ npm --prefix apps/web test
 
 ---
 
+## 3.8 Phase 05.1: Local Startup, API Connectivity & Runtime Verification
+
+### A. Healthcheck & Connectivity Verification
+Executed `node scripts/healthcheck.js` (`npm run healthcheck`):
+
+```text
+======================================================
+  AnimeManager — Healthcheck & Connectivity Status
+======================================================
+
+1. Checking Express API (direct on port 4000)...
+   ✔ API Process (port 4000): REACHABLE (HTTP 200)
+     Version: 1.0.0, Uptime: 12s
+   ✔ Database Connection: CONNECTED (PostgreSQL healthy)
+   ✔ Overall API Status: HEALTHY
+
+2. Checking Frontend Vite Proxy (port 5173 -> 4000)...
+   ✔ Frontend Proxy (port 5173 -> 4000): PROXYING SUCCESSFULLY (HTTP 200)
+
+------------------------------------------------------
+✔ ALL SYSTEMS OPERATIONAL
+```
+
+### B. Live HTTP Request Testing Matrix
+All endpoints tested against the live running server through the Vite proxy (`http://localhost:5173`):
+
+| Endpoint Tested | Auth / Headers | HTTP Status | Verified Response Behavior |
+|---|---|---|---|
+| `GET /api/v1/health` | None | **200 OK** | Returns `{"status":"healthy","database":"connected","version":"1.0.0"}` |
+| `GET /api/v1/titles` | None (Unauthenticated) | **401 Unauthorized** | Returns `{"error":{"code":"UNAUTHORIZED","message":"Authentication required"}}` |
+| `GET /api/v1/titles` | `Bearer <dev_token>` | **200 OK** | Returns 3 seeded titles (`Cowboy Bebop`, `Berserk`, `Solo Leveling`) with bookmarks |
+| `GET /api/v1/collections` | `Bearer <dev_token>` | **200 OK** | Returns 3 seeded collections (`Favorites`, `Masterpieces`, `Action & Adventure`) |
+| `GET /api/v1/bookmarks` | `Bearer <dev_token>` | **200 OK** | Returns 3 seeded bookmarks with ratings and status categories |
+
+### C. Development Process Runner & Graceful Shutdown
+- **Startup:** `node scripts/dev.js` (`npm run dev`) successfully compiles the API TypeScript project, detects port availability, and spawns both `[api]` and `[web]` processes concurrently.
+- **Port Bindings:** Express bound to `0.0.0.0:4000`; Vite bound to `0.0.0.0:5173`. Vite proxy targets `http://127.0.0.1:4000` to prevent IPv6 loopback delay.
+- **Shutdown:** Clean `SIGINT` (Ctrl+C) handling sends interrupt signals to child processes and releases port 4000 without orphaned background tasks.
+
+---
+
 ## 4. Planned Testing Matrix (Phases 01–07)
 
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
-    Comp[Component, Catalog & Responsive QA Tests<br/>Node test runner / 32 Passed - Phase 04 Part 3 PASSED]
-    Int[API Integration Tests<br/>Supertest / 64 Passed - Phase 02 & 03 PASSED]
+    Comp[Component, Catalog & Responsive QA Tests<br/>Node test runner / 40 Passed - Phase 05 PASSED]
+    Int[API Integration Tests<br/>Supertest / 68 Passed - Phase 02, 03 & 05 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
 
@@ -364,5 +410,6 @@ graph TD
 - [x] **Phase 04 Part 2: Interactive Catalog & Filtering QA:** 21/21 PASSED (Search filtering, clearing query, no-results state, media type filtering, sorting, bookmark status filtering, empty states, poster fallbacks, valid navigation, and honest Add Title preview behavior).
 - [x] **Phase 04 Part 3: Frontend Verification & Responsive QA:** 32/32 PASSED (8 routes verified, modal dismissal, keyboard navigation, responsive CSS contracts across 360px–1440px, non-persistence disclosures, 101 monorepo tests total).
 - [x] **Phase 05: Full-Stack Integration & Library Workflows:** 113/113 PASSED (5 shared schema tests, 68 API integration tests including 4 new export tests, 40 frontend tests including 8 new workflow tests; 18 live DB assertions pass; production build succeeds).
+- [x] **Phase 05.1: Local Startup, API Connectivity & Runtime Verification:** PASSED (Root `npm run dev`, `npm run healthcheck`, Vite proxy `127.0.0.1:4000`, live HTTP 200/401 tests, graceful Ctrl+C shutdown, `docs/LOCAL_DEVELOPMENT.md`).
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
 - [ ] **Phase 07: Production Smoke Tests:** Health, login, title/collection/bookmark management on production deployment.

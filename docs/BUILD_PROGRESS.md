@@ -6,8 +6,8 @@
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
 - **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 05: Full-Stack Integration & Core Library Workflows**
-- **Phase 05 Status:** **COMPLETED** (Verified across API integration, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress, Jikan Import, JSON/CSV Export, 40 Web Tests, 68 API Tests, 5 Shared Tests, 18 DB Assertions, and Clean Build)
+- **Current Active Phase:** **Phase 05.1: Local Startup, API Connectivity & Runtime Verification**
+- **Phase 05.1 Status:** **COMPLETED** (Verified across unified startup `npm run dev`, healthcheck `npm run healthcheck`, Vite proxy `127.0.0.1:4000`, live HTTP 200/401 checks, graceful shutdown, documentation in `docs/LOCAL_DEVELOPMENT.md`, and all 113 quality gate tests passing)
 - **Next Phase:** **Phase 06: Hardening: Security, Accessibility, & Performance** (Pending user review and authorization)
 
 ---
@@ -24,6 +24,7 @@
 | **Phase 04 (Part 2)** | Interactive Catalog UI, Search, Filters & Navigation | **COMPLETED** | Interactive catalog UI with search, filtering (media type, status), sorting (alphabetical, rating, year), AddTitleModal preview form with honest disclosure, URL search sync via `useSearchParams`, and 21 automated frontend unit tests. |
 | **Phase 04 (Part 3)** | Frontend Verification, Responsive QA & Phase Gate | **COMPLETED** | Comprehensive verification of all 8 routes, responsive CSS audit across 360px, 390px, 768px, 1024px, 1440px viewports, modal dismissal (backdrop click and Escape key), honest non-persistence disclosures for `/import` and `/settings`, URL search parameter sync, and 32/32 passing frontend tests (101 monorepo tests total). |
 | **Phase 05** | Full-Stack Integration & Core Library Workflows | **COMPLETED** | React frontend connected to Express REST backend via TanStack Query and typed `ApiClient`; AuthProvider and token storage; Title CRUD and Detail view (`/titles/:id`) with confirmed deletion; Collections management with multi-collection title membership and strict independence from bookmarks; Bookmarks tracking with status tabs, chapter/episode progress stepper, and personal rating; Jikan Import UI with URL parsing, candidate search, metadata preview, duplicate warning, manga/manhwa disambiguation, and atomic commit; JSON and CSV export endpoints and UI download triggers; 40 web tests, 68 API tests, 5 shared tests (113 total passing automated tests). |
+| **Phase 05.1** | Local Startup, API Connectivity & Runtime Verification | **COMPLETED** | Diagnosed and fixed `ECONNREFUSED` / HTTP 500 error; established zero-dependency concurrent runner `scripts/dev.js` (`npm run dev`) with labeled logs (`[api]`, `[web]`), graceful shutdown, and port conflict checks; created `scripts/healthcheck.js` (`npm run healthcheck`) verifying API, DB, and Vite proxy; aligned Vite proxy target to `http://127.0.0.1:4000`; created `docs/LOCAL_DEVELOPMENT.md` and root `README.md`; verified live HTTP requests. |
 | **Phase 06** | Hardening: Security, Accessibility, & Performance | **PENDING REVIEW** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. Awaiting user authorization. |
 | **Phase 07** | Deployment Preparation & Production Verification | **NOT STARTED** | Frontend deployed to Vercel; Express API deployed to compatible Node host; Supabase production instance configured with RLS and Storage policies; smoke tests pass; rollback plan verified. |
 
@@ -105,6 +106,14 @@
   - Added automated test suite `apps/web/test/phase05-workflows.test.js` (8 tests) and `apps/api/test/export.test.js` (4 tests).
 - [x] Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test` (113/113 pass: 5 shared + 68 API + 40 web), `npm run build`, `npm run test:api` (68/68 pass), `npm run test:db` (18/18 pass) all pass with zero errors.
 
+- [x] Phase 05.1 Local Startup, API Connectivity & Runtime Verification implemented:
+  - Root Cause Diagnosed: Resolved `ECONNREFUSED` / HTTP 500 error caused by Express API not being started by single `npm run dev` in `apps/web` and IPv6/IPv4 loopback discrepancies on macOS.
+  - Implemented root development runner `scripts/dev.js` (`npm run dev`) compiling API TypeScript, detecting port availability, and spawning Express API (4000) and Vite frontend (5173) with labeled color streams (`[api]`, `[web]`) and clean `SIGINT`/`SIGTERM` process management.
+  - Implemented root healthcheck script `scripts/healthcheck.js` (`npm run healthcheck`) testing direct Express reachability, PostgreSQL database readiness (`database: "connected"`), and Vite proxy forwarding.
+  - Updated Vite proxy in `apps/web/vite.config.ts` to target `http://127.0.0.1:4000` and bound Express in `apps/api/src/server.ts` to `0.0.0.0` with database startup probe.
+  - Created comprehensive setup documentation in `docs/LOCAL_DEVELOPMENT.md` and project entry point `README.md`.
+  - Verified live HTTP endpoints: direct health (200), proxy health (200), unauthenticated requests (401), and authenticated titles, collections, and bookmarks (200).
+
 ### Work Not Yet Started (Phase 06 to Phase 07)
 - [ ] Security, accessibility, and performance hardening audits (Phase 06).
 - [ ] Production deployments on Vercel and Node host with Supabase (Phase 07).
@@ -122,6 +131,8 @@
 | **API Integration Tests** | `npm run test:api` | **PASS** | 68 tests pass in `apps/api` using Node test runner against isolated test database (includes auth, titles, collections, bookmarks, import, export, and resilience). |
 | **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources; Vite bundles client assets in ~1.08s. |
 | **Database Verification** | `npm run test:db` | **PASS** | 18 assertions pass against live PostgreSQL: 10 tables, triggers, constraints, multi-collection membership, cascade deletions, and cross-owner RLS policies. |
+| **Healthcheck Suite** | `npm run healthcheck` | **PASS** | Verifies Express API process (port 4000), PostgreSQL connection, and Vite proxy forwarding (port 5173 -> 4000). |
+| **Development Runner** | `npm run dev` | **PASS** | Starts both API and Web with labeled terminal output and clean Ctrl+C shutdown. |
 | **Git Safety** | `git status` | **PASS** | Clean staging; `.env`, `node_modules`, and build artifacts strictly ignored. |
 
 ---

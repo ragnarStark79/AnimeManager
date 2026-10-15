@@ -1,7 +1,7 @@
 # AnimeManager — Known Limitations & Scope Constraints
 
-**Document Version:** 1.2
-**Phase:** Phase 04 Part 3 (Frontend Verification, Responsive QA & Phase Gate)
+**Document Version:** 1.3
+**Phase:** Phase 05.1 (Local Startup, API Connectivity & Runtime Verification)
 **Status:** Documented & Verified
 
 ---
@@ -57,6 +57,8 @@
 
 2. **Local PostgreSQL & Supabase Environment:**
    - A local PostgreSQL service running on port 5432 is used for migration, seed, and constraint test verification via `npm run test:db` and `npm run test:api`.
+   - **Remote Supabase IPv6-Only Routing:** Certain hosted Supabase endpoints (e.g. direct database connection hostnames) resolve exclusively via IPv6 `AAAA` records. On local development machines or ISP routes where IPv6 traffic is not natively routed, direct connections fail with `EHOSTUNREACH`. For local development, the repository defaults to local PostgreSQL (`animemanager_test` on `localhost:5432`), while remote Supabase remains the production deployment target.
+
 3. **Browser Automation in Sandboxed CI/Dev Environment:**
    - In environments where outbound network access to external binary CDN repositories (`playwright.azureedge.net`) is firewalled or blocked, Playwright driver automatic installation fails.
    - **Mitigation & Verification:** Frontend verification is established through automated unit tests (`node:test` covering design tokens, glassmorphism fallbacks, UI components, router registration, and accessibility contracts), strict TypeScript typechecking, production Vite build validation, and static CSS media query auditing across 360px, 390px, 768px, 1024px, and 1440px viewports.
