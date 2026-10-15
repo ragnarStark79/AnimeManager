@@ -1,7 +1,7 @@
 # AnimeManager — Known Limitations & Scope Constraints
 
-**Document Version:** 1.3
-**Phase:** Phase 05.1 (Local Startup, API Connectivity & Runtime Verification)
+**Document Version:** 1.4
+**Phase:** Phase 05.2 (Authentication, JWT Lifecycle & Protected Workflow Repair)
 **Status:** Documented & Verified
 
 ---
@@ -76,3 +76,9 @@
    - **Demonstration Dataset Isolation:** The typed sample dataset (`src/data/demo.ts`) is retained exclusively for test suite backward compatibility and isolated test harness assertions. Authenticated views display live server data and explicit loading/error/empty states.
    - **Supabase Storage Configuration Requirement:** Direct file uploads to Supabase Storage require an active Supabase project with the `covers` bucket created and public/authenticated read policies established. In local offline development environments without hosted Supabase Storage, cover images are handled via external URLs or rendered with the application's gradient initial placeholders.
    - **Export Streaming:** JSON and CSV library exports are streamed directly from the Express backend via authenticated GET requests (`/api/v1/export/json` and `/api/v1/export/csv`), strictly scoped to the requesting owner and omitting credentials, signing keys, and secrets.
+
+3. **Local Development Authentication Lifecycle & Production Separation (Phase 05.2):**
+   - **Absence of User-Facing Sign-In Flow:** The frontend currently does not include an interactive Supabase Auth email/password or OAuth login modal. In production, Supabase Auth manages user registration and authentication tokens.
+   - **Option B Local Development Strategy:** To support local full-stack development without requiring active remote Supabase credentials, the backend provides a development session endpoint (`GET /api/v1/auth/dev-session`) guarded by `ENABLE_DEV_AUTH=true`. This endpoint issues short-lived (24h) JWTs strictly bound to the seeded local owner (`00000000-0000-0000-0000-000000000001`), ensuring compatibility with seed fixtures and automated test databases.
+   - **Production Isolation:** If `ENABLE_DEV_AUTH=true` is present when `NODE_ENV=production`, the backend throws a fatal configuration exception during boot. Test signing secrets are never used in production, and dev token issuance routes return 404/disabled when running in production mode.
+   - **Frontend Expiration Pruning:** Stale or expired tokens in browser `localStorage` are automatically detected via `isTokenExpired()` and cleared on client startup, avoiding recurring 401 loops. Automatic renewal is debounced to 15-second intervals, and state-mutating requests (`POST`/`PUT`/`DELETE`) are never repeated automatically after an authentication error.

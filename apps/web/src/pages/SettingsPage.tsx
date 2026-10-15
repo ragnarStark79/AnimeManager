@@ -21,12 +21,30 @@ import './Placeholder.css';
 /* Phase 05 Full-Stack Integration. (Historical note: No options are functional in this phase prior to Phase 05). */
 export function SettingsPage() {
   const queryClient = useQueryClient();
-  const { token, ownerId, email, setToken, logout } = useAuth();
+  const { token, ownerId, email, setToken, logout, isDevAuth, refreshDevToken, error: authError } = useAuth();
 
   const [customToken, setCustomToken] = useState(token || '');
+  const [isRefreshingDevToken, setIsRefreshingDevToken] = useState(false);
   const [tokenSavedMsg, setTokenSavedMsg] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setCustomToken(token || '');
+  }, [token]);
+
+  const handleRefreshDevToken = async () => {
+    setIsRefreshingDevToken(true);
+    try {
+      const ok = await refreshDevToken();
+      if (ok) {
+        setTokenSavedMsg(true);
+        setTimeout(() => setTokenSavedMsg(false), 3000);
+      }
+    } finally {
+      setIsRefreshingDevToken(false);
+    }
+  };
 
   // Check health and backend connectivity
   const {
@@ -218,17 +236,40 @@ export function SettingsPage() {
             <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--surface-glass)', border: '1px solid var(--border-subtle)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Active Owner UUID</span>
-                <Badge variant="primary" size="sm">Authenticated</Badge>
+                {isDevAuth ? (
+                  <Badge variant="warning" size="sm">Local Development</Badge>
+                ) : ownerId ? (
+                  <Badge variant="primary" size="sm">Authenticated</Badge>
+                ) : (
+                  <Badge variant="default" size="sm">Unauthenticated</Badge>
+                )}
               </div>
               <code style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
                 {ownerId || 'Not authenticated'}
               </code>
-              {email && (
-                <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                  Email: {email}
-                </p>
-              )}
+              <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                {isDevAuth
+                  ? 'Active session is using isolated local development owner (00000000-0000-0000-0000-000000000001).'
+                  : email
+                  ? `Email: ${email}`
+                  : 'Custom authenticated session.'}
+              </p>
             </div>
+
+            {authError && (
+              <div
+                style={{
+                  padding: 'var(--space-2) var(--space-3)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#fca5a5',
+                  fontSize: 'var(--font-size-xs)',
+                }}
+              >
+                {authError}
+              </div>
+            )}
 
             <form onSubmit={handleSaveToken} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <label htmlFor="custom-token-input" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>
@@ -243,16 +284,26 @@ export function SettingsPage() {
                 value={customToken}
                 onChange={(e) => setCustomToken(e.target.value)}
               />
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4 }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 4, flexWrap: 'wrap' }}>
                 <Button variant="secondary" size="sm" type="submit">
                   Save Token
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={handleRefreshDevToken}
+                  loading={isRefreshingDevToken}
+                  iconLeft={<RefreshCw size={14} />}
+                >
+                  Refresh Dev Session
                 </Button>
                 <Button variant="ghost" size="sm" type="button" onClick={() => { setCustomToken(''); logout(); }}>
                   Clear Token
                 </Button>
                 {tokenSavedMsg && (
                   <span style={{ fontSize: 'var(--font-size-xs)', color: '#34d399', alignSelf: 'center' }}>
-                    Token updated!
+                    Session updated!
                   </span>
                 )}
               </div>

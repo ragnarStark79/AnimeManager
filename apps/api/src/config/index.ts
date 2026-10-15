@@ -50,6 +50,11 @@ const envSchema = z.object({
   JIKAN_CACHE_TTL_MS: z.coerce.number().int().positive().default(300000),
   JIKAN_CACHE_MAX_ENTRIES: z.coerce.number().int().positive().default(200),
   JIKAN_MIN_REQUEST_INTERVAL_MS: z.coerce.number().int().positive().default(350),
+  ENABLE_DEV_AUTH: z.preprocess((val) => {
+    if (val === 'true' || val === true) return true;
+    if (val === 'false' || val === false) return false;
+    return undefined;
+  }, z.boolean().optional()),
 });
 
 function loadConfig() {
@@ -60,6 +65,12 @@ function loadConfig() {
     console.error(`\n[Config Error] Invalid or missing environment configuration:\n${missingKeys}\n`);
     throw new Error(`[Config Error] Invalid or missing environment configuration: ${result.error.errors.map((e) => e.path.join('.')).join(', ')}`);
   }
+
+  // Strict Security Guard: Never allow development auth flag in production
+  if (result.data.NODE_ENV === 'production' && result.data.ENABLE_DEV_AUTH === true) {
+    throw new Error('[Config Error] Fatal: ENABLE_DEV_AUTH cannot be enabled in production environments.');
+  }
+
   return result.data;
 }
 

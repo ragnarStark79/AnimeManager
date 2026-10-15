@@ -1,7 +1,7 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.8
-**Phase:** Phase 05.1 (Local Startup, API Connectivity & Runtime Verification)
+**Document Version:** 1.9
+**Phase:** Phase 05.2 (Authentication, JWT Lifecycle & Protected Workflow Repair)
 **Date:** 2026-10-15
 
 ---
@@ -33,19 +33,27 @@ During **Phase 05.1**, local development startup and API proxy connectivity were
 - **Unified Startup:** Created `scripts/dev.js` (`npm run dev`) to compile API TypeScript and concurrently spawn Express API (port 4000) and Vite frontend (port 5173) with formatted terminal labels (`[api]`, `[web]`), graceful shutdown (`SIGINT`/`SIGTERM`), and port collision checks.
 - **Healthcheck & Connectivity Verification:** Created `scripts/healthcheck.js` (`npm run healthcheck`) to verify direct API health, PostgreSQL database connection readiness, and Vite proxy forwarding. Verified real HTTP requests across `/api/v1/health`, authenticated `/api/v1/titles`, `/collections`, and `/bookmarks`. All 113 automated tests pass cleanly.
 
+During **Phase 05.2**, authentication, JWT lifecycle, and protected workflows were repaired and thoroughly verified:
+- **Root Cause Resolution:** Diagnosed browser HTTP 401 (`Invalid or expired authentication token`) errors: static `VITE_AUTH_TOKEN` had expired, default fallback token signature was invalid, and browser `localStorage` persisted the expired token without validating `exp`.
+- **Guarded Dev Session Management:** Created guarded backend endpoint `GET /api/v1/auth/dev-session` (and `POST /api/v1/auth/dev-token`) issuing fresh 24h JWTs strictly bound to seeded owner `00000000-0000-0000-0000-000000000001`. Client-supplied owner IDs are strictly ignored. Guarded by `ENABLE_DEV_AUTH=true`; startup crashes with a fatal error if enabled in production.
+- **Frontend Token Lifecycle & Auto-Pruning:** Upgraded `ApiClient` and `AuthProvider` with `isTokenExpired()` detection, automatic `localStorage` cleanup on startup, automatic session acquisition in development mode, debounced 401 recovery (15s throttle) to prevent infinite loops, and mutation protection.
+- **Settings Page Visibility:** Displayed active session origin ("Local Development Session" badge vs "Authenticated Session"), active owner UUID, manual "Refresh Dev Session" button, and honest error banners.
+- **Secret Leak Prevention:** Verified zero backend signing secrets or service-role keys in production frontend bundles (`npm run build`).
+- **Regression Suite:** Added 3 backend auth tests (`apps/api/test/auth.test.js`) and 6 frontend lifecycle tests (`apps/web/test/auth-lifecycle.test.js`). Monorepo test count increased to 122/122 passing (5 shared + 71 API + 46 web).
+
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01 through 05)
+## 2. Quality Gate Verification Matrix (Phases 01 through 05.2)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces (shared, api, web) | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 68 API + 40 web tests pass (113 total) | **PASS** |
-| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, QA, and Phase 05 workflows | 40/40 frontend assertions pass cleanly | **PASS** |
-| **API Integration Tests**| `npm run test:api` | Node test runner executes integration, importer, and export suites | 68/68 test assertions passed cleanly | **PASS** |
-| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles | Built cleanly with type definitions and Vite client bundle in ~1.08s | **PASS** |
+| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 71 API + 46 web tests pass (122 total) | **PASS** |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, QA, Phase 05 workflows, and Phase 05.2 auth lifecycle | 46/46 frontend assertions pass cleanly | **PASS** |
+| **API Integration Tests**| `npm run test:api` | Node test runner executes integration, importer, export, and auth suites | 71/71 test assertions passed cleanly | **PASS** |
+| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles; zero secret leaks in client assets | Built cleanly with type definitions and Vite client bundle; 0 leaks | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
 
 ---
@@ -386,13 +394,49 @@ All endpoints tested against the live running server through the Vite proxy (`ht
 
 ---
 
+### 3.9 Phase 05.2: Authentication, JWT Lifecycle & Protected Workflow Verification
+
+#### A. Backend Authentication & Dev-Session Tests (`apps/api/test/auth.test.js`)
+Executed `node --test apps/api/test/auth.test.js` (35 assertions passing):
+- **Development Token Issuance:** Verified `GET /api/v1/auth/dev-session` returns HTTP 200 with a valid signed JWT for seeded owner `00000000-0000-0000-0000-000000000001`.
+- **Owner Override Immunity:** Verified passing `{ ownerId: "attacker-id" }` in the request body is strictly ignored; the token is unconditionally bound to the default development owner.
+- **Production Guard:** Verified that attempting to enable dev session endpoints in production (`ENABLE_DEV_AUTH=true` with `NODE_ENV=production`) causes a fatal configuration error on startup.
+- **Signature & Expiry Rejection:** Verified tokens signed with mismatched keys fail with HTTP 401 (`signature verification failed`), and expired tokens fail with HTTP 401 (`token has expired`).
+- **Owner Scoping Enforcement:** Verified cross-owner read and write operations are strictly prevented via `owner_id` assertions.
+
+#### B. Frontend Authentication Lifecycle Tests (`apps/web/test/auth-lifecycle.test.js`)
+Executed `node --test apps/web/test/auth-lifecycle.test.js` (6 assertions passing):
+- **Token Expiration Detection:** Verified `isTokenExpired()` correctly detects past timestamps, honors the 10-second buffer, and marks unexpired tokens as valid.
+- **Expired Token Pruning:** Verified that `ApiClient` clears expired tokens from `localStorage` upon initialization rather than sending invalid `Bearer` headers.
+- **Dev Session Auto-Acquisition:** Verified `AuthProvider` requests `GET /api/v1/auth/dev-session` when initialized without a valid token in development mode.
+- **401 Recovery Throttling:** Verified 401 automatic recovery is throttled with a 15-second debounce window to prevent infinite retry loops.
+- **Mutation Idempotency on 401:** Verified `POST`, `PUT`, and `DELETE` requests are never retried automatically after a 401 authentication error.
+- **Client Bundle Secret Leak Audit:** Verified production build assets contain zero instances of `JWT_SECRET` or `SERVICE_ROLE_KEY`.
+
+#### C. Live HTTP Workflow & Session Verification
+Tested against the live full-stack application through Vite proxy (`http://localhost:5173`):
+
+| Action / Workflow Tested | HTTP Method & Path | Authorization Header | Result Status | Response Verification |
+|---|---|---|---|---|
+| Unauthenticated Read | `GET /api/v1/titles` | None | **401 Unauthorized** | Returns `{"error":{"code":"UNAUTHORIZED","message":"Authentication required"}}` |
+| Malformed Bearer | `GET /api/v1/titles` | `Bearer invalid.jwt.string` | **401 Unauthorized** | Returns `{"error":{"code":"UNAUTHORIZED","message":"Invalid or expired authentication token: signature verification failed"}}` |
+| Dev Session Issuance | `GET /api/v1/auth/dev-session` | None (Local Dev Only) | **200 OK** | Returns `{ success: true, data: { token, user: { id: "00000000-0000-0000-0000-000000000001", email: "dev@animemanager.local" } } }` |
+| Title Catalog Read | `GET /api/v1/titles` | `Bearer <dev_session_token>` | **200 OK** | Successfully returns seeded titles for user `00000000-0000-0000-0000-000000000001` |
+| Collection Read | `GET /api/v1/collections` | `Bearer <dev_session_token>` | **200 OK** | Successfully returns seeded collections |
+| Bookmark Read | `GET /api/v1/bookmarks` | `Bearer <dev_session_token>` | **200 OK** | Successfully returns seeded bookmarks |
+| Title Creation | `POST /api/v1/titles` | `Bearer <dev_session_token>` | **201 Created** | Creates persistent title `Phase 05.2 Auth Test Title`, returns new UUID |
+| Persistence Verification | `GET /api/v1/titles/:id` | `Bearer <dev_session_token>` | **200 OK** | Confirms record persists in database with owner `00000000-0000-0000-0000-000000000001` |
+| Confirmed Deletion | `DELETE /api/v1/titles/:id?confirm=true` | `Bearer <dev_session_token>` | **204 No Content** | Safely cleans up test record without affecting existing fixtures |
+
+---
+
 ## 4. Planned Testing Matrix (Phases 01–07)
 
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
-    Comp[Component, Catalog & Responsive QA Tests<br/>Node test runner / 40 Passed - Phase 05 PASSED]
-    Int[API Integration Tests<br/>Supertest / 68 Passed - Phase 02, 03 & 05 PASSED]
+    Comp[Component, Catalog, Responsive & Auth Lifecycle Tests<br/>Node test runner / 46 Passed - Phase 05.2 PASSED]
+    Int[API Integration Tests<br/>Supertest / 71 Passed - Phase 02, 03, 05 & 05.2 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
 
@@ -411,5 +455,6 @@ graph TD
 - [x] **Phase 04 Part 3: Frontend Verification & Responsive QA:** 32/32 PASSED (8 routes verified, modal dismissal, keyboard navigation, responsive CSS contracts across 360px–1440px, non-persistence disclosures, 101 monorepo tests total).
 - [x] **Phase 05: Full-Stack Integration & Library Workflows:** 113/113 PASSED (5 shared schema tests, 68 API integration tests including 4 new export tests, 40 frontend tests including 8 new workflow tests; 18 live DB assertions pass; production build succeeds).
 - [x] **Phase 05.1: Local Startup, API Connectivity & Runtime Verification:** PASSED (Root `npm run dev`, `npm run healthcheck`, Vite proxy `127.0.0.1:4000`, live HTTP 200/401 tests, graceful Ctrl+C shutdown, `docs/LOCAL_DEVELOPMENT.md`).
+- [x] **Phase 05.2: Authentication, JWT Lifecycle & Protected Workflow Repair:** PASSED (122/122 monorepo tests: 5 shared, 71 API, 46 web; guarded dev session endpoint, client expiration auto-pruning, debounced 401 recovery, zero secret leakage in client bundle, live HTTP CRUD verified).
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
 - [ ] **Phase 07: Production Smoke Tests:** Health, login, title/collection/bookmark management on production deployment.

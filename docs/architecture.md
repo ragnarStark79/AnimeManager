@@ -1,8 +1,8 @@
 # AnimeManager — System Architecture
 
-**Document Version:** 1.7
-**Status:** Local Startup, API Connectivity & Runtime Architecture Complete (Phase 05.1)
-**Implementation State:** Phases 01, 02, 03, 04, 05, and 05.1 Complete (PostgreSQL Schema, Express REST API, Resilient Jikan Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Jikan Import UI, JSON/CSV Export Endpoints, Concurrent Development Runner, Healthcheck Suite)
+**Document Version:** 1.8
+**Status:** Authentication, JWT Lifecycle & Protected Workflow Architecture Complete (Phase 05.2)
+**Implementation State:** Phases 01, 02, 03, 04, 05, 05.1, and 05.2 Complete (PostgreSQL Schema, Express REST API, Resilient Jikan Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Jikan Import UI, JSON/CSV Export Endpoints, Concurrent Development Runner, Healthcheck Suite, Guarded Dev Session Management, Client Expiry Pruning)
 **Next Phase:** Phase 06 Hardening: Security, Accessibility, & Performance (Pending user review and authorization)
 
 ---
@@ -364,3 +364,52 @@ graph LR
 2. **Unified Development Runner:** `scripts/dev.js` coordinates both the Express API and Vite frontend child processes with prefixed logging (`[api]` and `[web]`), graceful termination traps (`SIGINT`/`SIGTERM`), and port availability pre-flight checks.
 3. **Multi-Stage Healthcheck:** `scripts/healthcheck.js` (`npm run healthcheck`) provides actionable verification separating process reachability, PostgreSQL connection status, and Vite proxy forwarding.
 4. **Environment Encapsulation:** Client-side bundles are strictly prevented from accessing server-side database connection strings and signing keys; all backend requests from the browser route transparently through the relative `/api/v1` path.
+
+---
+
+## 9. Authentication & JWT Lifecycle Architecture
+
+### Token Lifecycle & Verification Model
+The application verifies authentication using JSON Web Tokens (JWT) conforming to the Supabase Auth standard:
+1. **Bearer Token Extraction:** All protected API routes pass through `apps/api/src/middleware/auth.middleware.ts`, which extracts the token from the `Authorization: Bearer <token>` header.
+2. **Cryptographic Verification:** Tokens are verified using `jsonwebtoken` against the backend secret (`JWT_SECRET` / `SUPABASE_JWT_SECRET`).
+3. **Owner Scoping:** The verified `sub` claim maps directly to `req.user.id`, which is injected as the mandatory `owner_id` for all downstream repository queries (`titles`, `collections`, `bookmarks`, `export`).
+4. **Structured Error Differentiation:** Signature mismatch (`JsonWebTokenError`) and expiration (`TokenExpiredError`) are distinguished in error logging and client responses while maintaining a consistent HTTP 401 envelope.
+
+```mermaid
+sequenceDiagram
+    participant Browser as React Frontend (Vite)
+    participant Storage as localStorage
+    participant API as Express API (/api/v1)
+    participant DB as PostgreSQL Database
+
+    Note over Browser,API: Local Development Startup
+    Browser->>Storage: Read animemanager_auth_token
+    alt Token Missing or Expired (isTokenExpired)
+        Browser->>API: GET /api/v1/auth/dev-session
+        API-->>Browser: HTTP 200 { token (24h), user: { id: "00000000-0000-0000-0000-000000000001" } }
+        Browser->>Storage: Persist valid token
+    end
+
+    Note over Browser,API: Authenticated Request
+    Browser->>API: GET /api/v1/titles [Authorization: Bearer <token>]
+    API->>API: Verify JWT signature & exp
+    API->>DB: SELECT * FROM titles WHERE owner_id = '00000000-0000-0000-0000-000000000001'
+    DB-->>API: Rows
+    API-->>Browser: HTTP 200 { success: true, data: [...] }
+
+    Note over Browser,API: Expired Session Recovery
+    Browser->>API: GET /api/v1/collections [Authorization: Bearer <stale_token>]
+    API-->>Browser: HTTP 401 { code: "UNAUTHORIZED", message: "Invalid or expired..." }
+    Browser->>Browser: Check recovery throttle (15s cooldown)
+    Browser->>API: GET /api/v1/auth/dev-session
+    API-->>Browser: HTTP 200 { token: <fresh_token> }
+    Browser->>Storage: Update token
+```
+
+### Development vs. Production Safety Boundaries
+- **Guarded Development Endpoint:** `GET /api/v1/auth/dev-session` and `POST /api/v1/auth/dev-token` are enabled exclusively when `ENABLE_DEV_AUTH=true`.
+- **Fatal Production Crash Guard:** If `NODE_ENV === 'production'` and `ENABLE_DEV_AUTH === true`, API configuration validation throws a fatal exception during startup, refusing to boot.
+- **Client Override Immunity:** The dev token controller unconditionally binds issued tokens to seeded owner `00000000-0000-0000-0000-000000000001`. Client-supplied `ownerId` parameters in the body or query are strictly ignored.
+- **Zero Frontend Secret Exposure:** Neither `JWT_SECRET` nor `SUPABASE_SERVICE_ROLE_KEY` is ever prefixed with `VITE_` or embedded into client assets. Static analysis during `npm run build` verifies zero matches across output bundles.
+- **Debounced 401 Auto-Recovery:** The frontend throttles automated dev session renewal to once per 15 seconds. If a token fails, mutations (`POST`/`PUT`/`DELETE`) are never retried automatically to prevent duplicate record creation.

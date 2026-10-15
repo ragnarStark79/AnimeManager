@@ -42,6 +42,12 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
     if (err instanceof UnauthorizedError) {
       throw err;
     }
+    if (err instanceof jwt.TokenExpiredError) {
+      throw new UnauthorizedError('Invalid or expired authentication token: token has expired');
+    }
+    if (err instanceof jwt.JsonWebTokenError) {
+      throw new UnauthorizedError('Invalid or expired authentication token: signature verification failed');
+    }
     throw new UnauthorizedError('Invalid or expired authentication token');
   }
 }

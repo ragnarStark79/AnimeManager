@@ -10,6 +10,7 @@ import { collectionsRouter } from './routes/collections.routes.js';
 import { bookmarksRouter } from './routes/bookmarks.routes.js';
 import { importRouter } from './routes/import.routes.js';
 import { exportRouter } from './routes/export.routes.js';
+import { authRouter } from './routes/auth.routes.js';
 import { NotFoundError } from './errors/index.js';
 
 export function createApp(): Express {
@@ -32,6 +33,7 @@ export function createApp(): Express {
   // Mount API v1 routes
   const apiRouter = express.Router();
   apiRouter.use(healthRouter);
+  apiRouter.use(authRouter);
   apiRouter.use(titlesRouter);
   apiRouter.use(collectionsRouter);
   apiRouter.use(bookmarksRouter);

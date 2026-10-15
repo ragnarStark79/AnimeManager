@@ -6,8 +6,8 @@
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
 - **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 05.1: Local Startup, API Connectivity & Runtime Verification**
-- **Phase 05.1 Status:** **COMPLETED** (Verified across unified startup `npm run dev`, healthcheck `npm run healthcheck`, Vite proxy `127.0.0.1:4000`, live HTTP 200/401 checks, graceful shutdown, documentation in `docs/LOCAL_DEVELOPMENT.md`, and all 113 quality gate tests passing)
+- **Current Active Phase:** **Phase 05.2: Authentication, JWT Lifecycle & Protected Workflow Repair**
+- **Phase 05.2 Status:** **COMPLETED** (Verified across backend dev token issuer `/api/v1/auth/dev-session`, automatic frontend session acquisition and renewal, expiration pruning, 401 recovery debouncing, Settings page transparency, 71 API tests, 46 web tests, 5 shared tests [122 total], and live HTTP verification)
 - **Next Phase:** **Phase 06: Hardening: Security, Accessibility, & Performance** (Pending user review and authorization)
 
 ---
@@ -25,6 +25,7 @@
 | **Phase 04 (Part 3)** | Frontend Verification, Responsive QA & Phase Gate | **COMPLETED** | Comprehensive verification of all 8 routes, responsive CSS audit across 360px, 390px, 768px, 1024px, 1440px viewports, modal dismissal (backdrop click and Escape key), honest non-persistence disclosures for `/import` and `/settings`, URL search parameter sync, and 32/32 passing frontend tests (101 monorepo tests total). |
 | **Phase 05** | Full-Stack Integration & Core Library Workflows | **COMPLETED** | React frontend connected to Express REST backend via TanStack Query and typed `ApiClient`; AuthProvider and token storage; Title CRUD and Detail view (`/titles/:id`) with confirmed deletion; Collections management with multi-collection title membership and strict independence from bookmarks; Bookmarks tracking with status tabs, chapter/episode progress stepper, and personal rating; Jikan Import UI with URL parsing, candidate search, metadata preview, duplicate warning, manga/manhwa disambiguation, and atomic commit; JSON and CSV export endpoints and UI download triggers; 40 web tests, 68 API tests, 5 shared tests (113 total passing automated tests). |
 | **Phase 05.1** | Local Startup, API Connectivity & Runtime Verification | **COMPLETED** | Diagnosed and fixed `ECONNREFUSED` / HTTP 500 error; established zero-dependency concurrent runner `scripts/dev.js` (`npm run dev`) with labeled logs (`[api]`, `[web]`), graceful shutdown, and port conflict checks; created `scripts/healthcheck.js` (`npm run healthcheck`) verifying API, DB, and Vite proxy; aligned Vite proxy target to `http://127.0.0.1:4000`; created `docs/LOCAL_DEVELOPMENT.md` and root `README.md`; verified live HTTP requests. |
+| **Phase 05.2** | Authentication, JWT Lifecycle & Protected Workflow Repair | **COMPLETED** | Diagnosed and resolved 401 Unauthorized errors caused by expired static env token and invalid dev signature; implemented guarded backend development session endpoint (`GET /api/v1/auth/dev-session`, `POST /api/v1/auth/dev-token`) issuing fresh 24h JWT for seeded owner (`00000000-0000-0000-0000-000000000001`); implemented client-side `isTokenExpired()` pruning on startup, debounced 401 auto-recovery, and Settings page session management; verified zero backend secrets in production frontend bundle; 122 automated tests pass. |
 | **Phase 06** | Hardening: Security, Accessibility, & Performance | **PENDING REVIEW** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. Awaiting user authorization. |
 | **Phase 07** | Deployment Preparation & Production Verification | **NOT STARTED** | Frontend deployed to Vercel; Express API deployed to compatible Node host; Supabase production instance configured with RLS and Storage policies; smoke tests pass; rollback plan verified. |
 
@@ -114,6 +115,15 @@
   - Created comprehensive setup documentation in `docs/LOCAL_DEVELOPMENT.md` and project entry point `README.md`.
   - Verified live HTTP endpoints: direct health (200), proxy health (200), unauthenticated requests (401), and authenticated titles, collections, and bookmarks (200).
 
+- [x] Phase 05.2 Authentication, JWT Lifecycle & Protected Workflow Repair implemented:
+  - Diagnosed Root Cause: `401 Unauthorized` in browser caused by expired static token in `.env` (`jwt expired`) and mismatched secret in hardcoded fallback (`invalid signature`), which persisted in `localStorage`.
+  - Implemented guarded backend dev token issuer in Express (`GET /api/v1/auth/dev-session`, `POST /api/v1/auth/dev-token`) generating valid 24h JWTs strictly scoped to seeded owner `00000000-0000-0000-0000-000000000001`.
+  - Added startup safety check: `ENABLE_DEV_AUTH` is strictly prohibited in `NODE_ENV === 'production'`.
+  - Upgraded client-side token lifecycle in `api-client.ts` and `auth-context.tsx`: automatically prunes expired stored tokens on load, auto-fetches fresh dev session on startup, and provides debounced 401 recovery without infinite request loops.
+  - Enhanced `SettingsPage.tsx` with explicit session origin display ("Local Development" badge), owner UUID inspection, and "Refresh Dev Session" button.
+  - Added automated test suites: 3 new API tests in `apps/api/test/auth.test.js` (total 71 tests) and 6 new frontend tests in `apps/web/test/auth-lifecycle.test.js` (total 46 tests).
+  - Verified zero backend secrets or service-role keys in production frontend build.
+
 ### Work Not Yet Started (Phase 06 to Phase 07)
 - [ ] Security, accessibility, and performance hardening audits (Phase 06).
 - [ ] Production deployments on Vercel and Node host with Supabase (Phase 07).
@@ -126,10 +136,10 @@
 |---|---|---|---|
 | **Linting** | `npm run lint` | **PASS** | Checked across workspaces; clean execution with 0 warnings. |
 | **Type Checking** | `npm run typecheck` | **PASS** | Strict TypeScript compiler verified across `shared`, `api`, `web` with 0 type errors. |
-| **Monorepo Tests** | `npm test` | **PASS** | 5 schema unit tests in `shared`, 68 tests in `api`, 40 tests in `web` (total 113 automated tests pass). |
-| **Frontend Unit Tests** | `npm --prefix apps/web test` | **PASS** | 40/40 tests pass covering design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, search, clearing, no-results state, media filtering, sorting, bookmark status filtering, empty states, poster fallbacks, honest Add Title preview behavior, modal dismissal, responsive QA, and Phase 05 workflows. |
-| **API Integration Tests** | `npm run test:api` | **PASS** | 68 tests pass in `apps/api` using Node test runner against isolated test database (includes auth, titles, collections, bookmarks, import, export, and resilience). |
-| **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources; Vite bundles client assets in ~1.08s. |
+| **Monorepo Tests** | `npm test` | **PASS** | 5 schema unit tests in `shared`, 71 tests in `api`, 46 tests in `web` (total 122 automated tests pass). |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | **PASS** | 46/46 tests pass covering design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, search, clearing, no-results state, media filtering, sorting, bookmark status filtering, empty states, poster fallbacks, honest Add Title preview behavior, modal dismissal, responsive QA, Phase 05 workflows, and Phase 05.2 auth lifecycle. |
+| **API Integration Tests** | `npm run test:api` | **PASS** | 71 tests pass in `apps/api` using Node test runner against isolated test database (includes auth, dev-session, titles, collections, bookmarks, import, export, and resilience). |
+| **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources; Vite bundles client assets in ~1.43s with zero leaked secrets. |
 | **Database Verification** | `npm run test:db` | **PASS** | 18 assertions pass against live PostgreSQL: 10 tables, triggers, constraints, multi-collection membership, cascade deletions, and cross-owner RLS policies. |
 | **Healthcheck Suite** | `npm run healthcheck` | **PASS** | Verifies Express API process (port 4000), PostgreSQL connection, and Vite proxy forwarding (port 5173 -> 4000). |
 | **Development Runner** | `npm run dev` | **PASS** | Starts both API and Web with labeled terminal output and clean Ctrl+C shutdown. |
@@ -313,3 +323,51 @@
 - Created comprehensive verification and responsive QA test suite `apps/web/test/verification-qa.test.js` adding 11 automated checks.
 - Verified all quality gates across the monorepo: `npm run lint`, `npm run typecheck` (0 errors), `npm test` (101/101 pass: 5 shared, 64 API, 32 web), `npm run build` (clean dist bundles), `npm run test:api` (64/64 pass), and `npm run test:db` (18/18 live database assertions pass).
 - Verified Git working tree and documentation reconciliation.
+
+### Phase 05: Full-Stack Integration & Core Library Workflows
+- Integrated TanStack Query (`@tanstack/react-query`) with typed `ApiClient` (`apps/web/src/lib/api-client.ts`) and custom `ApiError` class.
+- Implemented `AuthProvider` and `useAuth` hook (`apps/web/src/lib/auth-context.tsx`) with localStorage token sync, claims parsing (`sub`, `email`), and fallback token integration.
+- Built `TitleDetailPage` (`/titles/:id`) featuring hero cover banner, metadata badges, interactive bookmark stepper, collection assignment picker, metadata edit modal, and confirmed deletion dialog (`DELETE /api/v1/titles/:id?confirm=true`).
+- Upgraded `AddTitleModal` to persist titles via `api.titles.create` with full field coverage.
+- Upgraded `TitlesPage` and `Dashboard` to fetch live data with search, media filtering, and sorting.
+- Implemented collection CRUD and multi-collection title membership in `CollectionsPage` and `MyListPage`, upholding the core domain invariant that collection deletion never deletes titles or bookmarks.
+- Implemented live bookmark tracking in `BookmarksPage` and `TitleDetailPage`, supporting status tabs, chapter/episode progress stepper, and personal ratings (0.0–10.0).
+- Connected `ImportPage` to `/api/v1/import/jikan/search`, `/preview`, and `/commit` with candidate selection, metadata preview, editable fields, duplicate MAL import warning banners, manga vs manhwa disambiguation, and atomic commit navigation.
+- Implemented JSON and CSV export endpoints in Express (`apps/api/src/routes/export.routes.ts`, `controllers/export.controller.ts`, `services/export.service.ts`) and download triggers in `SettingsPage`, strictly scoped to the requesting owner.
+- Added `apps/web/test/phase05-workflows.test.js` (8 tests) and `apps/api/test/export.test.js` (4 tests). Total monorepo tests increased to 113/113 passing (5 shared + 68 API + 40 web).
+
+### Phase 05.1: Local Startup, API Connectivity & Runtime Verification
+- Diagnosed and fixed `ECONNREFUSED` / HTTP 500 error caused by missing backend process in web-only dev workflow and macOS IPv6/IPv4 loopback delay (`::1` vs `127.0.0.1`).
+- Established zero-dependency concurrent runner `scripts/dev.js` (`npm run dev`) compiling API TypeScript and concurrently spawning Express API (port 4000) and Vite frontend (port 5173) with formatted terminal labels (`[api]`, `[web]`), graceful shutdown (`SIGINT`/`SIGTERM`), and port conflict checks.
+- Created `scripts/healthcheck.js` (`npm run healthcheck`) verifying API reachability, PostgreSQL database connection, and Vite proxy forwarding.
+- Aligned Vite proxy target to `http://127.0.0.1:4000` to prevent IPv6 loopback delay.
+- Created `docs/LOCAL_DEVELOPMENT.md` and root `README.md` startup guides.
+- Verified live HTTP requests across `/api/v1/health`, authenticated `/api/v1/titles`, `/collections`, and `/bookmarks`.
+
+### Phase 05.2: Authentication, JWT Lifecycle & Protected Workflow Repair
+- Diagnosed root causes of browser HTTP 401 (`Invalid or expired authentication token`):
+  1. Static `VITE_AUTH_TOKEN` in `.env` had expired (`jwt expired`).
+  2. Hardcoded fallback token in `auth-context.tsx` was signed with an invalid key (`invalid signature`).
+  3. Browser `localStorage` persisted the expired/invalid token without verifying `exp`, causing every browser request to fail.
+- Implemented guarded backend development session endpoint (`GET /api/v1/auth/dev-session`, `POST /api/v1/auth/dev-token`):
+  - Issues fresh 24-hour signed JWT strictly bound to seeded owner `00000000-0000-0000-0000-000000000001`.
+  - Client-supplied owner IDs in body/query are strictly ignored.
+  - Guarded by `ENABLE_DEV_AUTH=true`; startup throws fatal error if enabled in `production`.
+  - Test signing secret never used as production fallback.
+- Enhanced backend JWT middleware error handling to distinguish `TokenExpiredError` ("token has expired") and `JsonWebTokenError` ("signature verification failed") while retaining the expected message prefix.
+- Upgraded `ApiClient` and `AuthProvider`:
+  - Added `parseJwtPayload()` and `isTokenExpired()` with 10s clock-skew buffer.
+  - Pruned expired tokens automatically from `localStorage` on client startup and token setting.
+  - Dynamically fetched fresh dev session on startup in development mode (`import.meta.env.DEV`).
+  - Debounced 401 recovery (15-second throttle) to prevent infinite retry loops.
+  - Guaranteed mutations (`POST`/`PUT`/`DELETE`) never retry automatically on 401.
+- Updated `SettingsPage`:
+  - Added transparent session origin display ("Local Development Session" badge vs "Authenticated Session").
+  - Displayed active owner UUID.
+  - Added "Refresh Dev Session" button to manually renew the dev token.
+  - Displayed honest alert banner when authentication errors occur.
+- Verified zero backend secrets leaked into the production frontend bundle (`npm run build`).
+- Added automated regression tests:
+  - 3 new backend authentication tests in `apps/api/test/auth.test.js` (total 71 API tests pass).
+  - 6 new frontend lifecycle tests in `apps/web/test/auth-lifecycle.test.js` (total 46 web tests pass).
+- Monorepo automated test count increased to 122/122 passing (5 shared + 71 API + 46 web).

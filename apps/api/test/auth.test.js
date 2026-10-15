@@ -141,3 +141,37 @@ test('Authorization: Client-supplied owner_id in request body is strictly ignore
   // Verified: created title belongs to authenticated caller (Owner B), not injected Owner A
   assert.equal(res.body.data.ownerId, TEST_OWNER_B);
 });
+
+test('Dev Auth: GET /api/v1/auth/dev-session issues valid development token for TEST_OWNER_A', async () => {
+  const res = await request(app).get('/api/v1/auth/dev-session');
+  assert.equal(res.status, 200);
+  assert.ok(res.body.data.token);
+  assert.equal(res.body.data.ownerId, TEST_OWNER_A);
+  assert.equal(res.body.data.email, 'owner@example.com');
+  assert.equal(res.body.data.mode, 'development');
+
+  // Verify the issued token works on protected endpoints
+  const titlesRes = await request(app)
+    .get('/api/v1/titles')
+    .set('Authorization', `Bearer ${res.body.data.token}`);
+  assert.equal(titlesRes.status, 200);
+  assert.ok(Array.isArray(titlesRes.body.data));
+});
+
+test('Dev Auth: POST /api/v1/auth/dev-token strictly ignores injected owner parameters', async () => {
+  const res = await request(app)
+    .post('/api/v1/auth/dev-token')
+    .send({ ownerId: TEST_OWNER_B, sub: TEST_OWNER_B, role: 'admin' });
+  assert.equal(res.status, 200);
+  // Must still be TEST_OWNER_A
+  assert.equal(res.body.data.ownerId, TEST_OWNER_A);
+});
+
+test('Authentication: Expired token returns specific error detail', async () => {
+  const expiredToken = createToken(TEST_OWNER_A, { expiresIn: '-10s' });
+  const res = await request(app)
+    .get('/api/v1/titles')
+    .set('Authorization', `Bearer ${expiredToken}`);
+  assert.equal(res.status, 401);
+  assert.ok(res.body.error.message.includes('token has expired'));
+});

@@ -160,6 +160,31 @@ export class ApiError extends Error {
 // Token storage key
 const TOKEN_STORAGE_KEY = 'animemanager_auth_token';
 
+function parseJwtPayload(token: string): { exp?: number; sub?: string } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+export function isTokenExpired(token: string): boolean {
+  const payload = parseJwtPayload(token);
+  if (!payload || !payload.exp) return false;
+  // 10 second safety buffer before actual token expiration
+  return payload.exp * 1000 <= Date.now() + 10000;
+}
+
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -167,17 +192,22 @@ class ApiClient {
 
   constructor() {
     this.baseUrl = (import.meta.env.VITE_API_BASE_URL as string) || '/api/v1';
-    // Initialize token from localStorage or Vite env
+    // Initialize token from localStorage; prune if expired
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
-      this.token = stored || (import.meta.env.VITE_AUTH_TOKEN as string) || null;
+      if (stored && isTokenExpired(stored)) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        this.token = null;
+      } else {
+        this.token = stored || null;
+      }
     }
   }
 
   setToken(token: string | null): void {
     this.token = token;
     if (typeof window !== 'undefined') {
-      if (token) {
+      if (token && !isTokenExpired(token)) {
         localStorage.setItem(TOKEN_STORAGE_KEY, token);
       } else {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -448,6 +478,14 @@ class ApiClient {
         throw new ApiError(res.status, 'EXPORT_FAILED', `Failed to export CSV: ${res.statusText}`);
       }
       return res.text();
+    },
+  };
+
+  // --- Auth ---
+  auth = {
+    getDevSession: async (): Promise<{ token: string; ownerId: string; email: string; expiresIn: number; mode: string }> => {
+      const res = await this.request<SingleResponse<{ token: string; ownerId: string; email: string; expiresIn: number; mode: string }>>('/auth/dev-session');
+      return res.data;
     },
   };
 }

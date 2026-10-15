@@ -58,9 +58,12 @@ These variables must **never** be exposed to the client bundle:
 #### Frontend Safe Variables (`VITE_` Prefix)
 Only variables prefixed with `VITE_` are embedded into the client bundle by Vite:
 - `VITE_API_BASE_URL`: Set to `/api/v1` in local development so the browser sends requests through the Vite development proxy (`http://localhost:5173/api/v1/...`) to avoid CORS issues and match production routing.
-- `VITE_AUTH_TOKEN`: A valid development JWT signed with `JWT_SECRET` for local authenticated testing.
+- `VITE_APP_TITLE`: Optional application title (default: `AnimeManager`).
 - `VITE_SUPABASE_URL`: Public Supabase endpoint for client-side storage CDN access (if configured).
 - `VITE_SUPABASE_ANON_KEY`: Public anonymous key.
+
+> [!NOTE]
+> In local development mode (`npm run dev`), the frontend automatically acquires a fresh, properly signed JWT session for the local development owner (`00000000-0000-0000-0000-000000000001`) from the API at `GET /api/v1/auth/dev-session`. You do **not** need to generate or configure a static JWT in environment variables.
 
 > [!IMPORTANT]
 > Never commit `.env` to Git. The `.gitignore` file is configured to exclude all `.env` files.
@@ -187,8 +190,8 @@ curl -s http://localhost:5173/api/v1/health
 # Unauthenticated request (must return HTTP 401)
 curl -s -i http://localhost:5173/api/v1/titles
 
-# Authenticated request with Bearer token (must return HTTP 200)
-AUTH_TOKEN=$(grep VITE_AUTH_TOKEN .env | cut -d '=' -f2)
+# Authenticated request using the local development session endpoint (must return HTTP 200)
+AUTH_TOKEN=$(curl -s http://localhost:5173/api/v1/auth/dev-session | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).data.token))")
 curl -s -H "Authorization: Bearer $AUTH_TOKEN" http://localhost:5173/api/v1/titles
 ```
 
@@ -241,10 +244,14 @@ kill -9 <PID>
 - **Root Cause:** Certain remote Supabase project domains resolve exclusively via IPv6 (`AAAA` records). If the local network or macOS interface lacks an active IPv6 default route, outgoing connections fail.
 - **Solution:** Use the local PostgreSQL database for local development (`DATABASE_URL=postgresql://<user>@localhost:5432/animemanager_test`).
 
-### Problem 5: Unauthorized (HTTP 401) on API Requests
-- **Symptom:** API requests return `{"error":{"code":"UNAUTHORIZED","message":"Authentication required"}}`.
-- **Root Cause:** `VITE_AUTH_TOKEN` is missing from `.env` or expired, or `JWT_SECRET` differs between frontend and backend.
-- **Solution:** Ensure `.env` contains both a matching `JWT_SECRET` and a signed `VITE_AUTH_TOKEN`. A sample pre-signed development token for user `00000000-0000-0000-0000-000000000001` is provided in `.env.example`.
+### Problem 5: Unauthorized (HTTP 401: Invalid or expired authentication token)
+- **Symptom:** Browser shows `401 Unauthorized — Invalid or expired authentication token` when saving titles or fetching collections.
+- **Root Cause:** Stale or expired token in the browser's `localStorage` (`animemanager_auth_token`), or backend signing key discrepancy.
+- **Solution:**
+  1. Go to `Settings` in the UI and click **Refresh Dev Session** or **Clear Token**.
+  2. Alternatively, in the browser DevTools Console, run: `localStorage.removeItem('animemanager_auth_token')` and reload.
+  3. In development mode (`import.meta.env.DEV`), the application automatically detects expired tokens and refreshes a fresh development session from `GET /api/v1/auth/dev-session`.
+  4. In production, development sessions are strictly disabled (`ENABLE_DEV_AUTH=false`), and callers must provide valid authenticated Supabase session tokens.
 
 ---
 
