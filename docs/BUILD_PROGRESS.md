@@ -6,8 +6,8 @@
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
 - **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 05.2: Authentication, JWT Lifecycle & Protected Workflow Repair**
-- **Phase 05.2 Status:** **COMPLETED** (Verified across backend dev token issuer `/api/v1/auth/dev-session`, automatic frontend session acquisition and renewal, expiration pruning, 401 recovery debouncing, Settings page transparency, 71 API tests, 46 web tests, 5 shared tests [122 total], and live HTTP verification)
+- **Current Active Phase:** **Phase 05.3: Diagnose and Fix Jikan Import Search (HTTP 502)**
+- **Phase 05.3 Status:** **COMPLETED** (Diagnosed root-cause connection timeout to upstream Jikan API at 135.181.39.91:443; implemented 8-category network error classification, HTTP 504 gateway timeout semantics, sanitized upstream diagnostic logging, frontend error sanitization replacing raw "fetch failed", candidate suppression on failure, live Jikan probe script, 136 monorepo tests pass [5 shared + 80 API + 51 web], and all quality gates clean)
 - **Next Phase:** **Phase 06: Hardening: Security, Accessibility, & Performance** (Pending user review and authorization)
 
 ---
@@ -26,6 +26,7 @@
 | **Phase 05** | Full-Stack Integration & Core Library Workflows | **COMPLETED** | React frontend connected to Express REST backend via TanStack Query and typed `ApiClient`; AuthProvider and token storage; Title CRUD and Detail view (`/titles/:id`) with confirmed deletion; Collections management with multi-collection title membership and strict independence from bookmarks; Bookmarks tracking with status tabs, chapter/episode progress stepper, and personal rating; Jikan Import UI with URL parsing, candidate search, metadata preview, duplicate warning, manga/manhwa disambiguation, and atomic commit; JSON and CSV export endpoints and UI download triggers; 40 web tests, 68 API tests, 5 shared tests (113 total passing automated tests). |
 | **Phase 05.1** | Local Startup, API Connectivity & Runtime Verification | **COMPLETED** | Diagnosed and fixed `ECONNREFUSED` / HTTP 500 error; established zero-dependency concurrent runner `scripts/dev.js` (`npm run dev`) with labeled logs (`[api]`, `[web]`), graceful shutdown, and port conflict checks; created `scripts/healthcheck.js` (`npm run healthcheck`) verifying API, DB, and Vite proxy; aligned Vite proxy target to `http://127.0.0.1:4000`; created `docs/LOCAL_DEVELOPMENT.md` and root `README.md`; verified live HTTP requests. |
 | **Phase 05.2** | Authentication, JWT Lifecycle & Protected Workflow Repair | **COMPLETED** | Diagnosed and resolved 401 Unauthorized errors caused by expired static env token and invalid dev signature; implemented guarded backend development session endpoint (`GET /api/v1/auth/dev-session`, `POST /api/v1/auth/dev-token`) issuing fresh 24h JWT for seeded owner (`00000000-0000-0000-0000-000000000001`); implemented client-side `isTokenExpired()` pruning on startup, debounced 401 auto-recovery, and Settings page session management; verified zero backend secrets in production frontend bundle; 122 automated tests pass. |
+| **Phase 05.3** | Jikan Import Search Connectivity & Error Diagnostics | **COMPLETED** | Diagnosed upstream network timeout on public Jikan server (Hetzner IP 135.181.39.91); added 8-category network error classification (`UPSTREAM_DNS_ERROR`, `UPSTREAM_CONNECTION_ERROR`, `UPSTREAM_TLS_ERROR`, `UPSTREAM_TIMEOUT`, `UPSTREAM_RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_BAD_RESPONSE`, `UPSTREAM_INVALID_PAYLOAD`); upgraded timeout to HTTP 504; sanitized logs with request IDs; enhanced frontend error presentation and candidate suppression; created `scripts/test-jikan-live.js`; 136 monorepo tests pass. |
 | **Phase 06** | Hardening: Security, Accessibility, & Performance | **PENDING REVIEW** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. Awaiting user authorization. |
 | **Phase 07** | Deployment Preparation & Production Verification | **NOT STARTED** | Frontend deployed to Vercel; Express API deployed to compatible Node host; Supabase production instance configured with RLS and Storage policies; smoke tests pass; rollback plan verified. |
 
@@ -371,3 +372,30 @@
   - 3 new backend authentication tests in `apps/api/test/auth.test.js` (total 71 API tests pass).
   - 6 new frontend lifecycle tests in `apps/web/test/auth-lifecycle.test.js` (total 46 web tests pass).
 - Monorepo automated test count increased to 122/122 passing (5 shared + 71 API + 46 web).
+
+### Phase 05.3: Jikan Import Search Connectivity & Error Diagnostics
+- Diagnosed root cause of `502 Bad Gateway` / `Failed to connect to MyAnimeList: fetch failed`:
+  - Upstream DNS resolves `api.jikan.moe` to `135.181.39.91` and `2a01:4f9:c010:b863::1` (Hetzner, Helsinki).
+  - Traceroute reached Helsinki border router (`65.108.118.169`) then encountered 100% packet loss to `135.181.39.91`.
+  - Node.js `fetch` threw `TypeError: fetch failed` with `[cause]: ConnectTimeoutError (UND_ERR_CONNECT_TIMEOUT, AggregateError [ETIMEDOUT])`.
+  - The legacy client previously ignored `err.cause`, swallowed error codes, and threw a generic `ExternalProviderUnavailableError('Failed to connect to MyAnimeList: fetch failed')` returning HTTP 502 with the raw "fetch failed" string to the browser.
+- Upgraded backend Jikan client (`apps/api/src/services/import/jikan.client.ts`):
+  - Implemented `classifyNetworkError(err)` categorizing errors into 8 explicit categories: `UPSTREAM_DNS_ERROR`, `UPSTREAM_CONNECTION_ERROR`, `UPSTREAM_TLS_ERROR`, `UPSTREAM_TIMEOUT`, `UPSTREAM_RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_BAD_RESPONSE`, `UPSTREAM_INVALID_PAYLOAD`.
+  - Upstream connection timeouts and abort signals now throw `ExternalProviderTimeoutError` returning HTTP 504 `EXTERNAL_PROVIDER_TIMEOUT`.
+  - Outbound DNS resolution failures and connection refusals throw `ExternalProviderUnavailableError` returning HTTP 502 `EXTERNAL_PROVIDER_UNAVAILABLE`.
+  - Replaced raw `fetch failed` error strings with human-friendly diagnostics ("Connection to MyAnimeList timed out. The upstream server is not responding.") and structured error details (`[{ category, reason, retryable }]`).
+  - Added sanitized upstream diagnostic logging: `[Jikan Upstream Error] requestId=... category=... attempt=... duration=... reason=...` (never logs authorization headers, cookies, or secrets).
+  - Wired `requestId` through `import.controller.ts` -> `import.service.ts` -> `jikan.client.ts`.
+- Upgraded frontend Importer UI (`apps/web/src/pages/ImportPage.tsx`):
+  - Added `getSearchErrorTitle(err)` and `getSearchErrorMessage(err)` mapping HTTP 504 -> "Upstream Connection Timed Out", HTTP 502 -> "MyAnimeList Service Unavailable", and sanitizing any raw `fetch failed` string into actionable advice ("MyAnimeList search is temporarily unavailable. Please try again shortly.").
+  - Added preview mutation error state handling with retry support and clear alert banner.
+  - Suppressed stale `candidates` from prior queries whenever `searchError` is active.
+  - Enforced search submission concurrency guards (`if (isSearching || previewMutation.isPending) return;`).
+  - Added `.catch(() => {})` on `executeSearch()` to eliminate unhandled console rejections.
+- Implemented standalone live probe script (`scripts/test-jikan-live.js` via `npm run test:jikan:live`):
+  - Probes DNS A/AAAA records, TCP handshake on port 443, and Jikan v4 API queries, reporting latency, packet drop, or success with zero dependencies.
+- Added comprehensive regression tests:
+  - 6 new client tests in `apps/api/test/import-client.test.js` (network error classification, bad JSON, invalid schema, DNS error, timeout, cache exclusion on failure).
+  - 3 new API tests in `apps/api/test/import-api.test.js` (504 timeout formatting, 502 DNS failure formatting, empty search results).
+  - 5 new frontend tests in `apps/web/test/import-workflows.test.js` (sanitization of `fetch failed`, error title mapping, candidate suppression on failure, concurrency guard, preview error state).
+- Monorepo automated test count increased to **136 / 136 passing** (5 shared + 80 API + 51 web).

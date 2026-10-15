@@ -9,6 +9,122 @@ import {
 import { BoundedTtlCache } from './cache.js';
 import { RequestThrottler } from './throttler.js';
 
+export type UpstreamErrorCategory =
+  | 'UPSTREAM_DNS_ERROR'
+  | 'UPSTREAM_CONNECTION_ERROR'
+  | 'UPSTREAM_TLS_ERROR'
+  | 'UPSTREAM_TIMEOUT'
+  | 'UPSTREAM_RATE_LIMITED'
+  | 'UPSTREAM_UNAVAILABLE'
+  | 'UPSTREAM_BAD_RESPONSE'
+  | 'UPSTREAM_INVALID_PAYLOAD';
+
+export interface UpstreamDiagnosticContext {
+  requestId?: string;
+}
+
+/**
+ * Classifies raw Node fetch, undici, or network errors into structured upstream categories.
+ */
+export function classifyNetworkError(err: unknown): {
+  category: UpstreamErrorCategory;
+  message: string;
+  isTimeout: boolean;
+  rawReason: string;
+} {
+  const errorObj = err as any;
+
+  // 1. Explicit AbortError from AbortController timeout
+  if (errorObj?.name === 'AbortError' || errorObj?.code === 'ABORT_ERR') {
+    return {
+      category: 'UPSTREAM_TIMEOUT',
+      message: 'MyAnimeList API request timed out awaiting response.',
+      isTimeout: true,
+      rawReason: 'AbortError (timeout)',
+    };
+  }
+
+  // 2. Trace Node fetch / undici error cause hierarchy
+  const causes: any[] = [errorObj];
+  let current = errorObj;
+  while (current?.cause && causes.length < 5) {
+    causes.push(current.cause);
+    current = current.cause;
+  }
+
+  for (const c of causes) {
+    const code = c?.code || c?.name;
+    const msg = String(c?.message || '');
+
+    // Timeout errors (ConnectTimeoutError, ETIMEDOUT, UND_ERR_CONNECT_TIMEOUT)
+    if (
+      code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      code === 'ETIMEDOUT' ||
+      c?.name === 'ConnectTimeoutError' ||
+      msg.includes('Connect Timeout Error') ||
+      msg.includes('timed out')
+    ) {
+      return {
+        category: 'UPSTREAM_TIMEOUT',
+        message: 'Connection to MyAnimeList timed out. The upstream server is not responding.',
+        isTimeout: true,
+        rawReason: code || 'ETIMEDOUT',
+      };
+    }
+
+    // DNS errors (ENOTFOUND, EAI_AGAIN)
+    if (code === 'ENOTFOUND' || code === 'EAI_AGAIN' || msg.includes('getaddrinfo')) {
+      return {
+        category: 'UPSTREAM_DNS_ERROR',
+        message: 'Unable to resolve MyAnimeList service address (DNS lookup failed).',
+        isTimeout: false,
+        rawReason: code || 'ENOTFOUND',
+      };
+    }
+
+    // Connection refused or unreachable (ECONNREFUSED, ECONNRESET, EHOSTUNREACH, ENETUNREACH)
+    if (
+      code === 'ECONNREFUSED' ||
+      code === 'ECONNRESET' ||
+      code === 'EHOSTUNREACH' ||
+      code === 'ENETUNREACH' ||
+      msg.includes('No route to host') ||
+      msg.includes('Connection refused')
+    ) {
+      return {
+        category: 'UPSTREAM_CONNECTION_ERROR',
+        message: 'Could not connect to MyAnimeList (server unreachable or connection refused).',
+        isTimeout: false,
+        rawReason: code || 'ECONNREFUSED',
+      };
+    }
+
+    // TLS negotiation errors
+    if (
+      code === 'CERT_HAS_EXPIRED' ||
+      code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+      code === 'ERR_TLS_CERT_ALTNAME_INVALID' ||
+      code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+      msg.includes('SSL') ||
+      msg.includes('TLS')
+    ) {
+      return {
+        category: 'UPSTREAM_TLS_ERROR',
+        message: 'Failed to establish secure TLS connection to MyAnimeList.',
+        isTimeout: false,
+        rawReason: code || 'TLS_ERROR',
+      };
+    }
+  }
+
+  return {
+    category: 'UPSTREAM_UNAVAILABLE',
+    message: 'MyAnimeList metadata service is temporarily unreachable.',
+    isTimeout: false,
+    rawReason: errorObj?.message || 'Network error',
+  };
+}
+
 export interface JikanClientOptions {
   baseUrl?: string;
   timeoutMs?: number;
@@ -45,7 +161,13 @@ export class JikanClient {
   /**
    * Search anime or manga candidates via Jikan v4.
    */
-  async search(mediaType: 'anime' | 'manga', query: string, page = 1, limit = 10): Promise<any> {
+  async search(
+    mediaType: 'anime' | 'manga',
+    query: string,
+    page = 1,
+    limit = 10,
+    context?: UpstreamDiagnosticContext
+  ): Promise<any> {
     const trimmed = query.trim();
     if (!trimmed) {
       throw new BadRequestError('Search query cannot be empty');
@@ -61,7 +183,7 @@ export class JikanClient {
     }
 
     const url = `${this.baseUrl}/${mediaType}?q=${encodeURIComponent(trimmed)}&page=${safePage}&limit=${safeLimit}`;
-    const data = await this.fetchWithResilience(url);
+    const data = await this.fetchWithResilience(url, context);
 
     this.cache.set(cacheKey, data);
     return data;
@@ -70,7 +192,11 @@ export class JikanClient {
   /**
    * Fetch full metadata details for a given MAL ID.
    */
-  async getDetail(mediaType: 'anime' | 'manga', id: number): Promise<any> {
+  async getDetail(
+    mediaType: 'anime' | 'manga',
+    id: number,
+    context?: UpstreamDiagnosticContext
+  ): Promise<any> {
     if (!Number.isSafeInteger(id) || id <= 0) {
       throw new BadRequestError('Invalid MyAnimeList ID');
     }
@@ -82,7 +208,7 @@ export class JikanClient {
     }
 
     const url = `${this.baseUrl}/${mediaType}/${id}/full`;
-    const data = await this.fetchWithResilience(url);
+    const data = await this.fetchWithResilience(url, context);
 
     this.cache.set(cacheKey, data);
     return data;
@@ -112,8 +238,9 @@ export class JikanClient {
   /**
    * Internal resilient fetch with timeout, rate limit handling, and bounded backoff.
    */
-  private async fetchWithResilience(url: string): Promise<any> {
+  private async fetchWithResilience(url: string, context?: UpstreamDiagnosticContext): Promise<any> {
     let attempt = 0;
+    const startTime = Date.now();
 
     while (attempt <= this.maxRetries) {
       attempt++;
@@ -144,13 +271,15 @@ export class JikanClient {
             json = await response.json();
           } catch {
             throw new ExternalProviderUnavailableError(
-              'MyAnimeList API returned a malformed JSON response'
+              'MyAnimeList API returned a malformed response.',
+              [{ category: 'UPSTREAM_BAD_RESPONSE', retryable: false }]
             );
           }
 
           if (!json || typeof json !== 'object') {
             throw new ExternalProviderUnavailableError(
-              'MyAnimeList API returned an unexpected response structure'
+              'MyAnimeList API returned an unexpected response structure.',
+              [{ category: 'UPSTREAM_INVALID_PAYLOAD', retryable: false }]
             );
           }
 
@@ -160,7 +289,7 @@ export class JikanClient {
         // 2. HTTP 404 (Not Found) - Do not retry
         if (response.status === 404) {
           throw new ExternalResourceNotFoundError(
-            'The requested entry was not found on MyAnimeList'
+            'The requested entry was not found on MyAnimeList.'
           );
         }
 
@@ -182,11 +311,12 @@ export class JikanClient {
           }
 
           throw new ExternalProviderRateLimitError(
-            'MyAnimeList rate limit exceeded. Please wait a moment and try again.'
+            'MyAnimeList rate limit exceeded. Please wait a moment and try again.',
+            [{ category: 'UPSTREAM_RATE_LIMITED', retryable: true }]
           );
         }
 
-        // 4. HTTP 503 / 502 / 504 (Transient upstream server errors) - Bounded retry
+        // 4. HTTP 502 / 503 / 504 (Transient upstream server errors) - Bounded retry
         if (response.status === 502 || response.status === 503 || response.status === 504) {
           if (attempt <= this.maxRetries) {
             const delayMs = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms
@@ -195,20 +325,22 @@ export class JikanClient {
           }
 
           throw new ExternalProviderUnavailableError(
-            `MyAnimeList API returned upstream error status ${response.status}`
+            `MyAnimeList service is temporarily unavailable (HTTP ${response.status}). Please try again shortly.`,
+            [{ category: 'UPSTREAM_UNAVAILABLE', status: response.status, retryable: true }]
           );
         }
 
         // 5. Other 4xx Client Errors - Do not retry
         if (response.status >= 400 && response.status < 500) {
           throw new BadRequestError(
-            `MyAnimeList API rejected the request with HTTP status ${response.status}`
+            `MyAnimeList API rejected the request with HTTP status ${response.status}.`
           );
         }
 
         // 6. Generic 5xx Server Error
         throw new ExternalProviderUnavailableError(
-          `MyAnimeList API failed with status ${response.status}`
+          `MyAnimeList service returned server error HTTP ${response.status}. Please try again shortly.`,
+          [{ category: 'UPSTREAM_UNAVAILABLE', status: response.status, retryable: true }]
         );
       } catch (err: any) {
         clearTimeout(timeoutId);
@@ -217,32 +349,47 @@ export class JikanClient {
         if (
           err instanceof ExternalResourceNotFoundError ||
           err instanceof ExternalProviderRateLimitError ||
+          err instanceof ExternalProviderUnavailableError ||
+          err instanceof ExternalProviderTimeoutError ||
           err instanceof BadRequestError
         ) {
           throw err;
         }
 
-        // Abort / Timeout error
-        if (err.name === 'AbortError' || err.code === 'ABORT_ERR') {
-          throw new ExternalProviderTimeoutError(
-            `MyAnimeList API request timed out after ${this.timeoutMs}ms`
+        const classification = classifyNetworkError(err);
+        const elapsed = Date.now() - startTime;
+
+        if (config.NODE_ENV !== 'test') {
+          console.error(
+            `[Jikan Upstream Error] requestId=${context?.requestId || 'none'} category=${classification.category} attempt=${attempt}/${this.maxRetries + 1} elapsed=${elapsed}ms reason="${classification.rawReason}"`
           );
         }
 
-        // Network or fetch connection error (ECONNREFUSED, ENOTFOUND, etc.)
+        // Bounded retry for transient connection failures
         if (attempt <= this.maxRetries) {
           const delayMs = 500 * Math.pow(2, attempt - 1);
           await this.sleepFn(delayMs);
           continue;
         }
 
+        if (classification.isTimeout) {
+          throw new ExternalProviderTimeoutError(
+            classification.message,
+            [{ category: classification.category, reason: classification.rawReason, retryable: true }]
+          );
+        }
+
         throw new ExternalProviderUnavailableError(
-          `Failed to connect to MyAnimeList: ${err.message || 'Network error'}`
+          classification.message,
+          [{ category: classification.category, reason: classification.rawReason, retryable: true }]
         );
       }
     }
 
-    throw new ExternalProviderUnavailableError('MyAnimeList API request failed after retries');
+    throw new ExternalProviderUnavailableError(
+      'MyAnimeList API request failed after retry attempts.',
+      [{ category: 'UPSTREAM_UNAVAILABLE', retryable: true }]
+    );
   }
 }
 

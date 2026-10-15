@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { JikanClient } from '../dist/services/import/jikan.client.js';
+import { JikanClient, classifyNetworkError } from '../dist/services/import/jikan.client.js';
 import { BoundedTtlCache } from '../dist/services/import/cache.js';
 import { RequestThrottler } from '../dist/services/import/throttler.js';
 import {
@@ -194,4 +194,146 @@ test('RequestThrottler: Enforces inter-request minimum interval', async () => {
 
   const elapsed = Date.now() - start;
   assert.ok(elapsed >= 35, `Expected elapsed time >= 35ms, got ${elapsed}ms`);
+});
+
+test('classifyNetworkError: Correctly categorizes DNS, connection, TLS, and timeout causes', () => {
+  // 1. AbortError
+  const abort = new Error('aborted');
+  abort.name = 'AbortError';
+  assert.equal(classifyNetworkError(abort).category, 'UPSTREAM_TIMEOUT');
+
+  // 2. ConnectTimeoutError / UND_ERR_CONNECT_TIMEOUT
+  const timeoutErr = new Error('fetch failed');
+  timeoutErr.cause = { code: 'UND_ERR_CONNECT_TIMEOUT', message: 'Connect Timeout Error' };
+  assert.equal(classifyNetworkError(timeoutErr).category, 'UPSTREAM_TIMEOUT');
+
+  // 3. DNS failure (ENOTFOUND)
+  const dnsErr = new Error('fetch failed');
+  dnsErr.cause = { code: 'ENOTFOUND', message: 'getaddrinfo ENOTFOUND api.jikan.moe' };
+  assert.equal(classifyNetworkError(dnsErr).category, 'UPSTREAM_DNS_ERROR');
+
+  // 4. Connection refused (ECONNREFUSED)
+  const connErr = new Error('fetch failed');
+  connErr.cause = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' };
+  assert.equal(classifyNetworkError(connErr).category, 'UPSTREAM_CONNECTION_ERROR');
+
+  // 5. TLS error
+  const tlsErr = new Error('fetch failed');
+  tlsErr.cause = { code: 'CERT_HAS_EXPIRED', message: 'certificate has expired' };
+  assert.equal(classifyNetworkError(tlsErr).category, 'UPSTREAM_TLS_ERROR');
+});
+
+test('JikanClient: Rejects malformed JSON with UPSTREAM_BAD_RESPONSE', async () => {
+  const client = new JikanClient({
+    maxRetries: 0,
+    minIntervalMs: 0,
+    fetchFn: async () =>
+      new Response('<html>502 Bad Gateway</html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+  });
+
+  await assert.rejects(
+    () => client.search('anime', 'frieren'),
+    (err) => {
+      assert.ok(err instanceof ExternalProviderUnavailableError);
+      assert.equal(err.statusCode, 502);
+      assert.equal(err.details[0].category, 'UPSTREAM_BAD_RESPONSE');
+      return true;
+    }
+  );
+});
+
+test('JikanClient: Rejects invalid response payload structure with UPSTREAM_INVALID_PAYLOAD', async () => {
+  const client = new JikanClient({
+    maxRetries: 0,
+    minIntervalMs: 0,
+    fetchFn: async () =>
+      new Response(JSON.stringify('not-an-object'), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+  });
+
+  await assert.rejects(
+    () => client.search('anime', 'frieren'),
+    (err) => {
+      assert.ok(err instanceof ExternalProviderUnavailableError);
+      assert.equal(err.statusCode, 502);
+      assert.equal(err.details[0].category, 'UPSTREAM_INVALID_PAYLOAD');
+      return true;
+    }
+  );
+});
+
+test('JikanClient: Classifies DNS error and throws ExternalProviderUnavailableError', async () => {
+  const client = new JikanClient({
+    maxRetries: 0,
+    minIntervalMs: 0,
+    fetchFn: async () => {
+      const err = new TypeError('fetch failed');
+      err.cause = { code: 'ENOTFOUND', message: 'getaddrinfo ENOTFOUND' };
+      throw err;
+    },
+  });
+
+  await assert.rejects(
+    () => client.search('anime', 'frieren'),
+    (err) => {
+      assert.ok(err instanceof ExternalProviderUnavailableError);
+      assert.equal(err.statusCode, 502);
+      assert.equal(err.details[0].category, 'UPSTREAM_DNS_ERROR');
+      return true;
+    }
+  );
+});
+
+test('JikanClient: Classifies connect timeout and throws ExternalProviderTimeoutError (504)', async () => {
+  const client = new JikanClient({
+    maxRetries: 0,
+    minIntervalMs: 0,
+    fetchFn: async () => {
+      const err = new TypeError('fetch failed');
+      err.cause = { code: 'UND_ERR_CONNECT_TIMEOUT', message: 'Connect Timeout Error' };
+      throw err;
+    },
+  });
+
+  await assert.rejects(
+    () => client.search('anime', 'frieren'),
+    (err) => {
+      assert.ok(err instanceof ExternalProviderTimeoutError);
+      assert.equal(err.statusCode, 504);
+      assert.equal(err.details[0].category, 'UPSTREAM_TIMEOUT');
+      return true;
+    }
+  );
+});
+
+test('JikanClient: Failed requests are NOT cached', async () => {
+  let callCount = 0;
+  const client = new JikanClient({
+    maxRetries: 0,
+    minIntervalMs: 0,
+    fetchFn: async () => {
+      callCount++;
+      if (callCount === 1) {
+        const err = new TypeError('fetch failed');
+        err.cause = { code: 'ECONNREFUSED' };
+        throw err;
+      }
+      return new Response(JSON.stringify({ data: [{ mal_id: 1, title: 'Frieren' }] }), { status: 200 });
+    },
+  });
+
+  // First call fails
+  await assert.rejects(() => client.search('anime', 'frieren'));
+  assert.equal(callCount, 1);
+
+  // Second call must NOT return a cached error or empty result; it must hit fetchFn again and succeed!
+  const res = await client.search('anime', 'frieren');
+  assert.equal(callCount, 2);
+  assert.equal(res.data.length, 1);
+  assert.equal(res.data[0].mal_id, 1);
 });

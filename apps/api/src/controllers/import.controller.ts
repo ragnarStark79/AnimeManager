@@ -6,7 +6,7 @@ export const importController = {
   async search(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const query = req.query as unknown as ImportSearchQuery;
-      const result = await importService.search(query);
+      const result = await importService.search(query, req.requestId);
 
       res.status(200).json({
         data: result.items,
@@ -28,7 +28,7 @@ export const importController = {
     try {
       const ownerId = req.user!.id;
       const query = req.query as unknown as ImportPreviewQuery;
-      const draft = await importService.preview(ownerId, query);
+      const draft = await importService.preview(ownerId, query, req.requestId);
 
       res.status(200).json({
         data: draft,

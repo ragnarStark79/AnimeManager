@@ -360,3 +360,59 @@ test('Resilience: Manual title creation remains fully operational when Jikan is 
   assert.equal(manualRes.status, 201);
   assert.equal(manualRes.body.data.englishTitle, 'Completely Offline Manual Anime');
 });
+
+test('Import Search API: Upstream timeout returns 504 EXTERNAL_PROVIDER_TIMEOUT with UPSTREAM_TIMEOUT category', async () => {
+  const token = createToken(TEST_OWNER_A);
+
+  jikanClient.setFetchFn(async () => {
+    const err = new TypeError('fetch failed');
+    err.cause = { code: 'UND_ERR_CONNECT_TIMEOUT', message: 'Connect Timeout Error' };
+    throw err;
+  });
+
+  const res = await request(app)
+    .get('/api/v1/import/jikan/search?q=frieren&type=anime')
+    .set('Authorization', `Bearer ${token}`);
+
+  assert.equal(res.status, 504);
+  assert.equal(res.body.error.code, 'EXTERNAL_PROVIDER_TIMEOUT');
+  assert.ok(res.body.error.details.some((d) => d.category === 'UPSTREAM_TIMEOUT'));
+  assert.ok(!res.body.error.message.includes('fetch failed'));
+});
+
+test('Import Search API: Upstream DNS failure returns 502 with UPSTREAM_DNS_ERROR category', async () => {
+  const token = createToken(TEST_OWNER_A);
+
+  jikanClient.setFetchFn(async () => {
+    const err = new TypeError('fetch failed');
+    err.cause = { code: 'ENOTFOUND', message: 'getaddrinfo ENOTFOUND' };
+    throw err;
+  });
+
+  const res = await request(app)
+    .get('/api/v1/import/jikan/search?q=frieren&type=anime')
+    .set('Authorization', `Bearer ${token}`);
+
+  assert.equal(res.status, 502);
+  assert.equal(res.body.error.code, 'EXTERNAL_PROVIDER_UNAVAILABLE');
+  assert.ok(res.body.error.details.some((d) => d.category === 'UPSTREAM_DNS_ERROR'));
+});
+
+test('Import Search API: Empty candidate result returns 200 with empty array rather than error', async () => {
+  const token = createToken(TEST_OWNER_A);
+
+  jikanClient.setFetchFn(async () =>
+    new Response(JSON.stringify({ data: [], pagination: { has_next_page: false } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+
+  const res = await request(app)
+    .get('/api/v1/import/jikan/search?q=NonExistentTitle123456&type=anime')
+    .set('Authorization', `Bearer ${token}`);
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.data, []);
+  assert.equal(res.body.pagination.hasNextPage, false);
+});

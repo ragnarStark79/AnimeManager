@@ -329,6 +329,23 @@ To eliminate Server-Side Request Forgery (SSRF) vulnerabilities, the application
 - **Non-Retryable Errors:** Client errors (400, 404, etc.) fail immediately without retries.
 - **Decoupled Architecture:** If Jikan is unavailable, manual title creation, collection management, and bookmark tracking remain completely operational without interruption.
 
+### Upstream Network Error Classification & Diagnostics (Phase 05.3):
+- **8-Category Error Taxonomy:** `jikan.client.ts` implements `classifyNetworkError(err)` to inspect `err.code`, `err.name`, and underlying `err.cause` (including `Undici` and Node.js network errors):
+  - `UPSTREAM_DNS_ERROR`: Host resolution failures (`ENOTFOUND`, `EAI_AGAIN`).
+  - `UPSTREAM_CONNECTION_ERROR`: TCP connect refusals or drops (`ECONNREFUSED`, `ECONNRESET`, `EHOSTUNREACH`).
+  - `UPSTREAM_TLS_ERROR`: SSL/TLS handshake and certificate errors (`CERT_HAS_EXPIRED`, `DEPTH_ZERO_SELF_SIGNED_CERT`).
+  - `UPSTREAM_TIMEOUT`: Connection or request abort timeouts (`UND_ERR_CONNECT_TIMEOUT`, `ETIMEDOUT`, `TimeoutError`).
+  - `UPSTREAM_RATE_LIMITED`: HTTP 429 Too Many Requests.
+  - `UPSTREAM_UNAVAILABLE`: HTTP 503 Service Unavailable or gateway errors.
+  - `UPSTREAM_BAD_RESPONSE`: Non-JSON or malformed syntax from upstream.
+  - `UPSTREAM_INVALID_PAYLOAD`: Upstream JSON failing Zod schema validation.
+- **Gateway Status Code Semantics:**
+  - Upstream timeouts throw `ExternalProviderTimeoutError` returning HTTP 504 `EXTERNAL_PROVIDER_TIMEOUT`.
+  - DNS and connection failures throw `ExternalProviderUnavailableError` returning HTTP 502 `EXTERNAL_PROVIDER_UNAVAILABLE`.
+  - Raw `fetch failed` strings are intercepted and replaced with clear, user-friendly error messages and structured details (`details: [{ category, reason, retryable }]`).
+- **Sanitized Request ID Logging:** Internal server logs record `[Jikan Upstream Error]` including `requestId`, `category`, `durationMs`, `attempt`, and `reason`, while strictly stripping tokens, cookies, and sensitive headers.
+- **Frontend Error Sanitization & State Safety:** `ImportPage.tsx` maps status codes to distinct headings (504 -> *"Upstream Connection Timed Out"*, 502 -> *"MyAnimeList Service Unavailable"*), sanitizes raw fetch failures into actionable advice, and suppresses previous candidate results when an error occurs to prevent displaying stale data.
+
 ### Normalization & Atomic Commit:
 - **Manga vs. Manhwa:** Automatically sets `mediaType: "manhwa"` when source `type` explicitly equals `"Manhwa"`. For ambiguous manga entries, flags `needsMediaConfirmation: true` and includes a warning requiring the user to verify the classification before saving.
 - **Community Review Exclusion:** Community reviews are never retrieved or stored.

@@ -430,13 +430,47 @@ Tested against the live full-stack application through Vite proxy (`http://local
 
 ---
 
+### 3.10 Phase 05.3: Jikan Import Search Connectivity & Network Error Diagnostics
+
+#### A. Backend Adapter & Client Tests (`apps/api/test/import-client.test.js` & `import-api.test.js`)
+Executed `node --test apps/api/test/import-client.test.js apps/api/test/import-api.test.js` (80 API tests passing total):
+- **Error Classification:** Tested and verified `classifyNetworkError()` for all 8 categories:
+  - `UPSTREAM_DNS_ERROR`: Handled when `code === 'ENOTFOUND'`.
+  - `UPSTREAM_CONNECTION_ERROR`: Handled when `code === 'ECONNREFUSED'`.
+  - `UPSTREAM_TLS_ERROR`: Handled when code is `CERT_HAS_EXPIRED` or `DEPTH_ZERO_SELF_SIGNED_CERT`.
+  - `UPSTREAM_TIMEOUT`: Handled when `name === 'TimeoutError'`, `UND_ERR_CONNECT_TIMEOUT`, or cause includes `ETIMEDOUT`.
+  - `UPSTREAM_RATE_LIMITED`: Handled on HTTP 429 response.
+  - `UPSTREAM_UNAVAILABLE`: Handled on HTTP 503 response.
+  - `UPSTREAM_BAD_RESPONSE`: Handled when upstream returns non-JSON or malformed syntax.
+  - `UPSTREAM_INVALID_PAYLOAD`: Handled when upstream JSON fails Zod schema validation.
+- **HTTP 504 Timeout Semantics:** Verified connection timeouts throw `ExternalProviderTimeoutError` yielding HTTP 504 `EXTERNAL_PROVIDER_TIMEOUT` with user-friendly message rather than raw `fetch failed`.
+- **HTTP 502 Unavailability Semantics:** Verified connection refused and DNS failures throw `ExternalProviderUnavailableError` yielding HTTP 502 `EXTERNAL_PROVIDER_UNAVAILABLE`.
+- **Cache Exclusion on Failure:** Confirmed failed requests are strictly omitted from `BoundedTtlCache` so transient failures never poison future queries as empty successes.
+- **Sanitized Diagnostic Logging:** Verified upstream error logger formats structured context (`requestId`, `category`, `durationMs`, `attempt`, `reason`) while strictly stripping sensitive headers and tokens.
+
+#### B. Frontend Import Workflow Tests (`apps/web/test/import-workflows.test.js`)
+Executed `node --test apps/web/test/import-workflows.test.js` (51 web tests passing total):
+- **Fetch Failed Sanitization:** Verified `getSearchErrorMessage` intercepts raw `fetch failed` and `TypeError` messages and displays actionable user guidance: *"MyAnimeList search is temporarily unavailable. Please try again shortly."*
+- **Error Title Mapping:** Verified HTTP 504 maps to *"Upstream Connection Timed Out"*, HTTP 502 maps to *"MyAnimeList Service Unavailable"*, and HTTP 429 maps to *"MyAnimeList Rate Limit Exceeded"*.
+- **Candidate Suppression on Error:** Verified stale candidate results from previous searches are immediately hidden if a subsequent search fails.
+- **Concurrency Guard:** Verified duplicate simultaneous searches and submissions while queries are pending are blocked.
+- **Preview Error Resilience:** Verified preview mutation failures display an accessible ErrorState with retry trigger.
+
+#### C. Live Upstream Probe & Diagnostic Tooling (`scripts/test-jikan-live.js`)
+Executed `npm run test:jikan:live`:
+- DNS resolution: Verified `api.jikan.moe` successfully resolves to `135.181.39.91` and `2a01:4f9:c010:b863::1`.
+- TCP probe to `135.181.39.91:443`: Packet drops and connection timeouts identified on Hetzner routing (100% packet loss).
+- Diagnostic reporting: Accurately reports upstream network reachability status without falsely claiming upstream health or breaking automated CI test runners.
+
+---
+
 ## 4. Planned Testing Matrix (Phases 01–07)
 
 ```mermaid
 graph TD
     E2E[End-to-End Tests<br/>Playwright - Phase 05]
-    Comp[Component, Catalog, Responsive & Auth Lifecycle Tests<br/>Node test runner / 46 Passed - Phase 05.2 PASSED]
-    Int[API Integration Tests<br/>Supertest / 71 Passed - Phase 02, 03, 05 & 05.2 PASSED]
+    Comp[Component, Catalog, Responsive, Auth & Import Tests<br/>Node test runner / 51 Passed - Phase 05.3 PASSED]
+    Int[API Integration Tests<br/>Supertest / 80 Passed - Phase 02, 03, 05, 05.2 & 05.3 PASSED]
     DB[Database Tests<br/>18 Assertions - Phase 01 PASSED]
     Unit[Unit Tests<br/>Zod Schemas - Phase 01 PASSED]
 
@@ -456,5 +490,6 @@ graph TD
 - [x] **Phase 05: Full-Stack Integration & Library Workflows:** 113/113 PASSED (5 shared schema tests, 68 API integration tests including 4 new export tests, 40 frontend tests including 8 new workflow tests; 18 live DB assertions pass; production build succeeds).
 - [x] **Phase 05.1: Local Startup, API Connectivity & Runtime Verification:** PASSED (Root `npm run dev`, `npm run healthcheck`, Vite proxy `127.0.0.1:4000`, live HTTP 200/401 tests, graceful Ctrl+C shutdown, `docs/LOCAL_DEVELOPMENT.md`).
 - [x] **Phase 05.2: Authentication, JWT Lifecycle & Protected Workflow Repair:** PASSED (122/122 monorepo tests: 5 shared, 71 API, 46 web; guarded dev session endpoint, client expiration auto-pruning, debounced 401 recovery, zero secret leakage in client bundle, live HTTP CRUD verified).
+- [x] **Phase 05.3: Jikan Import Search Connectivity & Error Diagnostics:** PASSED (136/136 monorepo tests: 5 shared, 80 API, 51 web; 8-category error classification, HTTP 504 gateway timeout, sanitized diagnostic logs, UI error sanitization, candidate suppression on failure, live Jikan probe tool).
 - [ ] **Phase 06: Security & Accessibility Audits:** SSRF protection suite, file upload validation, axe a11y audit, keyboard focus traps.
 - [ ] **Phase 07: Production Smoke Tests:** Health, login, title/collection/bookmark management on production deployment.

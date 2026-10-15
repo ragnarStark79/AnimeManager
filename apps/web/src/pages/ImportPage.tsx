@@ -96,7 +96,7 @@ export function ImportPage() {
     enabled: false,
   });
 
-  const candidates: ImportSearchResultItem[] = Array.isArray(searchResultsData)
+  const candidates: ImportSearchResultItem[] = Array.isArray(searchResultsData) && !searchError
     ? searchResultsData
     : [];
 
@@ -137,9 +137,29 @@ export function ImportPage() {
     },
   });
 
+  const getSearchErrorMessage = (err: unknown): string => {
+    if (!err) return 'MyAnimeList search is temporarily unavailable. Please try again shortly.';
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('fetch failed') || msg.includes('Failed to connect')) {
+      return 'MyAnimeList search is temporarily unavailable. Please try again shortly.';
+    }
+    return msg;
+  };
+
+  const getSearchErrorTitle = (err: unknown): string => {
+    if (err && typeof err === 'object' && 'statusCode' in err) {
+      const code = (err as any).statusCode;
+      if (code === 504) return 'Upstream Connection Timed Out';
+      if (code === 502) return 'MyAnimeList Service Unavailable';
+      if (code === 429) return 'MyAnimeList Rate Limit Exceeded';
+    }
+    return 'Search Failed';
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
+    if (isSearching || previewMutation.isPending) return;
 
     // Check if input is a MyAnimeList URL
     const isUrl = searchQuery.trim().startsWith('http');
@@ -149,7 +169,7 @@ export function ImportPage() {
       setHasSearched(true);
       setSelectedCandidate(null);
       setPreviewDraft(null);
-      executeSearch();
+      executeSearch().catch(() => {});
     }
   };
 
@@ -245,12 +265,30 @@ export function ImportPage() {
             <LoadingState message="Querying MyAnimeList via resilient adapter..." />
           ) : searchError ? (
             <ErrorState
-              title="Search Failed"
-              message={searchError instanceof Error ? searchError.message : 'Could not reach Jikan importer.'}
-              onRetry={() => executeSearch()}
+              title={getSearchErrorTitle(searchError)}
+              message={getSearchErrorMessage(searchError)}
+              onRetry={() => executeSearch().catch(() => {})}
             />
           ) : previewMutation.isPending ? (
             <LoadingState message="Fetching metadata draft and checking duplicate status..." />
+          ) : previewMutation.isError ? (
+            <ErrorState
+              title="Preview Failed"
+              message={
+                previewMutation.error instanceof Error
+                  ? (previewMutation.error.message.includes('fetch failed')
+                      ? 'MyAnimeList metadata service is temporarily unavailable. Please try again shortly.'
+                      : previewMutation.error.message)
+                  : 'Failed to fetch title preview from MyAnimeList.'
+              }
+              onRetry={() => {
+                if (selectedCandidate) {
+                  handleCandidateSelect(selectedCandidate);
+                } else if (searchQuery.trim().startsWith('http')) {
+                  previewMutation.mutate({ url: searchQuery.trim() });
+                }
+              }}
+            />
           ) : hasSearched && candidates.length === 0 ? (
             <EmptyState
               icon={<Search size={36} strokeWidth={1.5} />}

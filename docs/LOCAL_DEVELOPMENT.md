@@ -253,6 +253,19 @@ kill -9 <PID>
   3. In development mode (`import.meta.env.DEV`), the application automatically detects expired tokens and refreshes a fresh development session from `GET /api/v1/auth/dev-session`.
   4. In production, development sessions are strictly disabled (`ENABLE_DEV_AUTH=false`), and callers must provide valid authenticated Supabase session tokens.
 
+### Problem 6: Jikan Upstream Connection Timeout or Search Failure
+- **Symptom:** Import search on `http://localhost:5173/import` displays *"Upstream Connection Timed Out"* or *"MyAnimeList Service Unavailable"*.
+- **Root Cause:** The public Jikan API endpoint (`https://api.jikan.moe/v4` hosted at `135.181.39.91` by Hetzner in Helsinki) may experience regional network packet drops, ISP routing blocks, or Cloudflare edge filtering.
+- **Diagnostics:**
+  Run the dedicated live Jikan diagnostic probe:
+  ```bash
+  npm run test:jikan:live
+  ```
+  This independently tests DNS A/AAAA resolution, TCP port 443 handshake, and a test query to verify whether your local environment can reach the public Jikan instance.
+- **Solution:**
+  1. If Jikan is temporarily unreachable, all core library operations remain 100% operational: manual title creation via **Add Title**, collection organization, bookmark status tracking, and JSON/CSV exports work without external network dependencies.
+  2. When network reachability to Hetzner is restored, the search endpoint automatically resumes functioning without requiring application restarts.
+
 ---
 
 ## 10. Safe Troubleshooting Procedure (No Data Loss)

@@ -29,12 +29,13 @@ export class ImportService {
   /**
    * Search anime or manga via Jikan v4 with caching and throttling.
    */
-  async search(query: ImportSearchQuery): Promise<ImportSearchResponse> {
+  async search(query: ImportSearchQuery, requestId?: string): Promise<ImportSearchResponse> {
     const rawData = await this.client.search(
       query.type,
       query.q,
       query.page || 1,
-      query.limit || 10
+      query.limit || 10,
+      { requestId }
     );
 
     const candidates = normalizeSearchCandidates(rawData.data || [], query.type);
@@ -51,7 +52,7 @@ export class ImportService {
    * Preview metadata draft for a given MyAnimeList URL or ID.
    * Performs read-only duplicate detection without mutating database.
    */
-  async preview(ownerId: string, query: ImportPreviewQuery): Promise<ImportDraft> {
+  async preview(ownerId: string, query: ImportPreviewQuery, requestId?: string): Promise<ImportDraft> {
     let target: { mediaType: 'anime' | 'manga'; id: number; canonicalUrl: string };
 
     if (query.url) {
@@ -68,7 +69,7 @@ export class ImportService {
     }
 
     // Fetch detail from Jikan
-    const rawDetail = await this.client.getDetail(target.mediaType, target.id);
+    const rawDetail = await this.client.getDetail(target.mediaType, target.id, { requestId });
 
     // Normalize metadata into draft
     const draft = normalizeDetailDraft(rawDetail, target.mediaType);
