@@ -9,6 +9,7 @@ import { titlesRouter } from './routes/titles.routes.js';
 import { collectionsRouter } from './routes/collections.routes.js';
 import { bookmarksRouter } from './routes/bookmarks.routes.js';
 import { importRouter } from './routes/import.routes.js';
+import { exportRouter } from './routes/export.routes.js';
 import { NotFoundError } from './errors/index.js';
 
 export function createApp(): Express {
@@ -35,6 +36,7 @@ export function createApp(): Express {
   apiRouter.use(collectionsRouter);
   apiRouter.use(bookmarksRouter);
   apiRouter.use(importRouter);
+  apiRouter.use(exportRouter);
 
   app.use('/api/v1', apiRouter);
 

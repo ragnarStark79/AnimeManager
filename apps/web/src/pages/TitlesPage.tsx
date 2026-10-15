@@ -1,37 +1,42 @@
-import React, { useState, useMemo, useCallback, useId, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useState, useCallback, useId, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   BookOpen,
   Search,
   X,
-  Zap,
-  Info,
+  Plus,
 } from 'lucide-react';
 import {
   EmptyState,
+  LoadingState,
+  ErrorState,
   FilterChips,
   SortControl,
   AddTitleModal,
   PosterCard,
+  Button,
 } from '../components/ui';
-import {
-  DEMO_TITLES,
-  DEMO_MEDIA_TYPES,
-  filterByMediaType,
-  searchTitles,
-  sortTitles,
-  type MediaType,
-  type SortKey,
-} from '../data/demo';
+import { api, type TitleSummary } from '../lib/api-client';
+import type { MediaType } from '@animemanager/shared';
 import './TitlesPage.css';
 
 /* ─────────────────────────────────────────────────────────── */
 
 type MediaFilter = MediaType | 'all';
+type SortKey =
+  | 'title-asc'
+  | 'title-desc'
+  | 'rating-desc'
+  | 'rating-asc'
+  | 'year-desc'
+  | 'year-asc';
 
 const FILTER_OPTIONS: { value: MediaFilter; label: string }[] = [
   { value: 'all',    label: 'All' },
-  ...DEMO_MEDIA_TYPES.map((t) => ({ value: t as MediaFilter, label: t.charAt(0).toUpperCase() + t.slice(1) })),
+  { value: 'anime',  label: 'Anime' },
+  { value: 'manga',  label: 'Manga' },
+  { value: 'manhwa', label: 'Manhwa' },
 ];
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -81,14 +86,45 @@ export function TitlesPage() {
     }, { replace: true });
   };
 
-  const results = useMemo(() => {
-    const byType = filterByMediaType(
-      DEMO_TITLES,
-      mediaFilter === 'all' ? null : mediaFilter,
-    );
-    const searched = searchTitles(byType, query);
-    return sortTitles(searched, sort);
-  }, [query, mediaFilter, sort]);
+  // Live API query
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['titles', query, mediaFilter, sort],
+    queryFn: () => {
+      let sortBy = 'updatedAt';
+      let sortOrder: 'asc' | 'desc' = 'desc';
+
+      if (sort === 'title-asc') {
+        sortBy = 'title';
+        sortOrder = 'asc';
+      } else if (sort === 'title-desc') {
+        sortBy = 'title';
+        sortOrder = 'desc';
+      } else if (sort === 'rating-desc') {
+        sortBy = 'personalRating';
+        sortOrder = 'desc';
+      } else if (sort === 'rating-asc') {
+        sortBy = 'personalRating';
+        sortOrder = 'asc';
+      } else if (sort === 'year-desc') {
+        sortBy = 'releaseYear';
+        sortOrder = 'desc';
+      } else if (sort === 'year-asc') {
+        sortBy = 'releaseYear';
+        sortOrder = 'asc';
+      }
+
+      return api.titles.list({
+        search: query.trim() || undefined,
+        mediaType: mediaFilter === 'all' ? undefined : mediaFilter,
+        sortBy,
+        sortOrder,
+        pageSize: 100,
+      });
+    },
+  });
+
+  const titles: TitleSummary[] = data?.data || [];
+  const totalCount = data?.pagination?.total ?? titles.length;
 
   const hasQuery  = query.trim().length > 0;
   const hasFilter = mediaFilter !== 'all';
@@ -98,179 +134,160 @@ export function TitlesPage() {
       {/* ── Page header ── */}
       <div className="titles-header">
         <div>
-          <p className="placeholder-eyebrow">
-            <BookOpen size={13} aria-hidden="true" /> Titles
-          </p>
-          <h1 className="placeholder-title">All Titles</h1>
-          <p className="placeholder-sub">
-            Browse, search, and manage your complete title catalog.
+          <h1 className="titles-title">Library Catalog</h1>
+          <p className="titles-subtitle">
+            Browse, search, and manage your complete personal anime, manga, and manhwa collection.
           </p>
         </div>
-        <div className="titles-header-actions">
-          <button
-            type="button"
-            className="btn btn--primary btn--md"
-            onClick={() => setAddOpen(true)}
-          >
-            <span aria-hidden="true">+</span>
-            Add Title
-          </button>
-          <Link to="/import" className="btn btn--secondary btn--md">
-            <Zap size={15} aria-hidden="true" />
-            Import from MAL
-          </Link>
-        </div>
+        <Button
+          variant="primary"
+          size="md"
+          iconLeft={<Plus size={16} />}
+          onClick={() => setAddOpen(true)}
+        >
+          Add Title
+        </Button>
       </div>
 
-      {/* ── Demo notice ── */}
-      <div className="titles-demo-notice" role="note">
-        <Info size={14} aria-hidden="true" />
-        <span>
-          <strong>Sample catalog</strong> — These {DEMO_TITLES.length} titles are
-          demonstration data. Your real library will appear here after backend
-          connection in Phase 05.
-        </span>
-      </div>
-
-      {/* ── Search + Controls bar ── */}
-      <div className="titles-controls">
+      {/* ── Search & Filter toolbar ── */}
+      <div className="titles-toolbar" role="search" aria-label="Catalog filters">
         <div className="titles-search-wrap">
           <label htmlFor={searchId} className="sr-only">
-            Search titles
+            Search titles by name or original title
           </label>
-          <div className="titles-search-inner">
-            <Search size={16} className="titles-search-icon" aria-hidden="true" />
-            <input
-              id={searchId}
-              type="search"
-              className="titles-search-input"
-              placeholder="Search by title, genre…"
-              value={query}
-              onChange={(e) => handleQueryChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  if (query) {
-                    handleClear();
-                  } else {
-                    e.currentTarget.blur();
-                  }
+          <Search size={16} className="titles-search-icon" aria-hidden="true" />
+          <input
+            id={searchId}
+            type="search"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (query) {
+                  handleClear();
+                } else {
+                  e.currentTarget.blur();
                 }
-              }}
-              autoComplete="off"
-              spellCheck={false}
-              aria-label="Search titles"
-            />
-            {hasQuery && (
-              <button
-                type="button"
-                className="titles-search-clear"
-                aria-label="Clear search"
-                onClick={handleClear}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
+              }
+            }}
+            placeholder="Search by title, original title, or alias..."
+            className="titles-search-input"
+            autoComplete="off"
+            spellCheck="false"
+          />
+          {hasQuery && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="titles-search-clear"
+              aria-label="Clear search query"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
 
-        <div className="titles-controls-right">
+        <div className="titles-filter-controls">
           <FilterChips
             options={FILTER_OPTIONS}
             value={mediaFilter}
-            onChange={setMediaFilter}
+            onChange={(v) => setMediaFilter(v as MediaFilter)}
             label="Filter by media type"
-            className="filter-chips--scroll"
           />
+
           <SortControl
             options={SORT_OPTIONS}
             value={sort}
-            onChange={setSort}
-            label="Sort titles"
+            onChange={(v) => setSort(v as SortKey)}
+            aria-label="Sort library catalog"
           />
         </div>
       </div>
 
-      {/* ── Results count ── */}
-      <div className="titles-results-meta" aria-live="polite" aria-atomic="true">
-        {hasQuery || hasFilter ? (
-          <span className="titles-results-count">
-            {results.length === 0
-              ? 'No results'
-              : `${results.length} of ${DEMO_TITLES.length} titles`}
+      {/* ── Active filters feedback ── */}
+      {(hasQuery || hasFilter) && (
+        <div className="titles-active-feedback" aria-live="polite">
+          <span>
+            Showing {titles.length} of {totalCount} {totalCount === 1 ? 'title' : 'titles'}
+            {hasQuery && <> matching &ldquo;<strong>{query}</strong>&rdquo;</>}
+            {hasFilter && <> in <strong>{mediaFilter}</strong></>}
           </span>
-        ) : (
-          <span className="titles-results-count">
-            {DEMO_TITLES.length} titles (sample catalog)
-          </span>
-        )}
-        {(hasQuery || hasFilter) && (
           <button
             type="button"
-            className="titles-reset-btn"
+            className="titles-reset-link"
             onClick={() => {
               handleClear();
               setMediaFilter('all');
             }}
           >
-            Clear filters
+            Reset all
           </button>
-        )}
-      </div>
-
-      {/* ── Catalog grid or empty state ── */}
-      {results.length > 0 ? (
-        <div className="titles-grid" role="list" aria-label="Title catalog">
-          {results.map((item) => (
-            <div key={item.titleId} role="listitem">
-              <PosterCard
-                titleId={item.titleId}
-                title={item.title}
-                mediaType={item.mediaType}
-                coverUrl={item.coverUrl}
-                year={item.year}
-                rating={item.rating}
-              />
-            </div>
-          ))}
         </div>
-      ) : hasQuery ? (
-        <EmptyState
-          icon={<Search size={36} strokeWidth={1.5} />}
-          title="No results found"
-          description={`No titles matched "${query}". Try a different search term or clear the filter.`}
-          action={
-            <button type="button" className="btn btn--secondary btn--md" onClick={handleClear}>
-              Clear Search
-            </button>
-          }
-        />
-      ) : (
-        <EmptyState
-          icon={<BookOpen size={36} strokeWidth={1.5} />}
-          title="Your catalog is empty"
-          description="Add your first anime, manga, or manhwa manually or import from MyAnimeList."
-          action={
-            <div className="titles-empty-actions">
-              <button
-                type="button"
-                className="btn btn--primary btn--md"
-                onClick={() => setAddOpen(true)}
-              >
-                Add Manually
-              </button>
-              <Link to="/import" className="btn btn--secondary btn--md">
-                Import from MAL
-              </Link>
-            </div>
-          }
-        />
       )}
 
-      {/* ── Add Title Modal ── */}
-      <AddTitleModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-      />
+      {/* ── Main content / Grid ── */}
+      {isLoading ? (
+        <LoadingState message="Fetching catalog from library..." />
+      ) : error ? (
+        <ErrorState
+          title="Failed to Load Library"
+          message={error instanceof Error ? error.message : 'Could not retrieve titles from the server.'}
+          onRetry={() => refetch()}
+        />
+      ) : titles.length === 0 ? (
+        hasQuery || hasFilter ? (
+          <EmptyState
+            icon={<Search size={32} />}
+            title="No results found"
+            description="Try adjusting your search terms or media type filters to find what you're looking for."
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  handleClear();
+                  setMediaFilter('all');
+                }}
+              >
+                Clear Search
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<BookOpen size={32} />}
+            title="Your library is empty"
+            description="Start building your collection by adding titles manually or importing them from MyAnimeList."
+            action={
+              <Button variant="primary" size="sm" onClick={() => setAddOpen(true)}>
+                Add Your First Title
+              </Button>
+            }
+          />
+        )
+      ) : (
+        <div
+          className="titles-grid"
+          role="region"
+          aria-label={`Catalog results (${titles.length} items)`}
+        >
+          {titles.map((item) => (
+            <PosterCard
+              key={item.id}
+              titleId={item.id}
+              title={item.englishTitle}
+              mediaType={item.mediaType}
+              coverUrl={item.coverUrl || undefined}
+              year={item.releaseYear || undefined}
+              rating={item.bookmark?.personalRating ?? (item.sourceScore ?? undefined)}
+              status={item.publicationStatus || undefined}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Add Title Dialog ── */}
+      <AddTitleModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }

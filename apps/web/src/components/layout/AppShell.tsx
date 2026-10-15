@@ -17,7 +17,7 @@ const pageTitles: Record<string, string> = {
 
 export function AppShell() {
   const location = useLocation();
-  const pageTitle = pageTitles[location.pathname] ?? 'AnimeManager';
+  const pageTitle = pageTitles[location.pathname] ?? (location.pathname.startsWith('/titles/') ? 'Title Detail' : 'AnimeManager');
 
   return (
     <div className="app-shell">

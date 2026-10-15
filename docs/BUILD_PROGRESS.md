@@ -6,9 +6,9 @@
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
 - **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 04 — Part 3: Frontend Verification, Responsive QA & Phase Gate**
-- **Phase 04 Status:** **COMPLETED** (Verified across 360px–1440px viewports, 32 Frontend Tests, 64 API Tests, 18 DB Assertions, and Clean Production Build)
-- **Next Phase:** **Phase 05: Product Workflows & End-to-End Integration** (Pending user review and authorization)
+- **Current Active Phase:** **Phase 05: Full-Stack Integration & Core Library Workflows**
+- **Phase 05 Status:** **COMPLETED** (Verified across API integration, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress, Jikan Import, JSON/CSV Export, 40 Web Tests, 68 API Tests, 5 Shared Tests, 18 DB Assertions, and Clean Build)
+- **Next Phase:** **Phase 06: Hardening: Security, Accessibility, & Performance** (Pending user review and authorization)
 
 ---
 
@@ -23,8 +23,8 @@
 | **Phase 04 (Part 1)** | Visual Foundation, Design System & Application Shell | **COMPLETED** | Vite + React + TypeScript application configured; custom CSS design tokens (`tokens.css`), glassmorphism utilities (`glassmorphism.css`), animations, global styling, AppShell, Header with center pill navigation, Sidebar, MobileNav, 8 reusable UI components (`Button`, `Badge`, `Input`, `GlassCard`, `PosterCard`, `EmptyState`, `LoadingState`, `ErrorState`), Dashboard with dual spotlight cards & 6-poster grid, route placeholders for `/bookmarks`, `/my-list`, `/collections`, `/titles`, `/settings`, and `*` 404 page; 11/11 automated frontend tests pass. |
 | **Phase 04 (Part 2)** | Interactive Catalog UI, Search, Filters & Navigation | **COMPLETED** | Interactive catalog UI with search, filtering (media type, status), sorting (alphabetical, rating, year), AddTitleModal preview form with honest disclosure, URL search sync via `useSearchParams`, and 21 automated frontend unit tests. |
 | **Phase 04 (Part 3)** | Frontend Verification, Responsive QA & Phase Gate | **COMPLETED** | Comprehensive verification of all 8 routes, responsive CSS audit across 360px, 390px, 768px, 1024px, 1440px viewports, modal dismissal (backdrop click and Escape key), honest non-persistence disclosures for `/import` and `/settings`, URL search parameter sync, and 32/32 passing frontend tests (101 monorepo tests total). |
-| **Phase 05** | Product Workflows & End-to-End Integration | **PENDING REVIEW** | UI connected to backend APIs; manual title creation/editing, collection management, bookmark tracking with progress, cover upload/URL, search/filter/sort, import preview/commit, and JSON/CSV export operational. Awaiting explicit user authorization. |
-| **Phase 06** | Hardening: Security, Accessibility, & Performance | **NOT STARTED** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. |
+| **Phase 05** | Full-Stack Integration & Core Library Workflows | **COMPLETED** | React frontend connected to Express REST backend via TanStack Query and typed `ApiClient`; AuthProvider and token storage; Title CRUD and Detail view (`/titles/:id`) with confirmed deletion; Collections management with multi-collection title membership and strict independence from bookmarks; Bookmarks tracking with status tabs, chapter/episode progress stepper, and personal rating; Jikan Import UI with URL parsing, candidate search, metadata preview, duplicate warning, manga/manhwa disambiguation, and atomic commit; JSON and CSV export endpoints and UI download triggers; 40 web tests, 68 API tests, 5 shared tests (113 total passing automated tests). |
+| **Phase 06** | Hardening: Security, Accessibility, & Performance | **PENDING REVIEW** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. Awaiting user authorization. |
 | **Phase 07** | Deployment Preparation & Production Verification | **NOT STARTED** | Frontend deployed to Vercel; Express API deployed to compatible Node host; Supabase production instance configured with RLS and Storage policies; smoke tests pass; rollback plan verified. |
 
 ---
@@ -90,8 +90,22 @@
   - Created automated verification test suite `apps/web/test/verification-qa.test.js` (11 new tests, total 32/32 web tests pass).
 - [x] Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test` (101/101 pass), `npm run build`, `npm run test:api` (64/64 pass), `npm run test:db` (18/18 pass) all pass with zero errors.
 
-### Work Not Yet Started (Phase 05 to Phase 07)
-- [ ] End-to-end integration of collections, bookmarks, title details, and import workflows (Phase 05).
+- [x] Phase 05 Full-Stack Integration & Core Library Workflows implemented across `apps/api` and `apps/web`:
+  - Installed `@tanstack/react-query` and created `queryClient` with 2-minute stale time and 4xx bypass.
+  - Implemented typed `ApiClient` (`apps/web/src/lib/api-client.ts`) with custom `ApiError` class, JWT header injection, and typed resource namespaces for titles, collections, bookmarks, import, and export.
+  - Implemented `AuthProvider` and `useAuth` hook (`apps/web/src/lib/auth-context.tsx`) with localStorage token sync, JWT claims parsing (`sub`, `email`), and dev token fallback.
+  - Created Title Detail view (`TitleDetailPage.tsx`, `TitleDetailPage.css`) with hero poster, metadata stats, interactive bookmark tracking stepper, collection assignment picker, metadata edit modal, and confirmed delete modal (`DELETE /api/v1/titles/:id?confirm=true`).
+  - Upgraded `AddTitleModal.tsx` to persist titles via `api.titles.create` with full field coverage (display title, original title, media type, release year, cover URL, synopsis, episode/chapter count, genres, tags) and query invalidation.
+  - Upgraded `TitlesPage.tsx` and `Dashboard.tsx` to fetch from live `api.titles.list` with debounced search, media type filter chips, sort options, loading, error, and empty states.
+  - Upgraded `CollectionsPage.tsx` and `MyListPage.tsx` to fetch and mutate collections via `api.collections.list`, `create`, `update`, `delete`, and collection title membership (`addTitle`, `removeTitle`) while upholding the invariant that collection deletion never touches titles or bookmarks.
+  - Upgraded `BookmarksPage.tsx` to fetch and tally live bookmarks across status categories (`consuming`, `plan_to_consume`, `completed`, `on_hold`, `dropped`).
+  - Upgraded `ImportPage.tsx` to connect to `api.import.search`, `api.import.preview`, and `api.import.commit` with candidate selection, editable field inputs, duplicate MAL import warning banners, manga vs manhwa disambiguation radio controls, and optional initial bookmark/collection assignment.
+  - Created library export endpoints in Express (`apps/api/src/routes/export.routes.ts`, `controllers/export.controller.ts`, `services/export.service.ts`) for authenticated JSON backup (`/api/v1/export/json`) and CSV download (`/api/v1/export/csv`) with strict owner isolation.
+  - Upgraded `SettingsPage.tsx` with functional JSON and CSV backup download triggers, token inspection/override, connection health check, and honest Supabase Storage setup requirement disclosures.
+  - Added automated test suite `apps/web/test/phase05-workflows.test.js` (8 tests) and `apps/api/test/export.test.js` (4 tests).
+- [x] Quality gates verified: `npm run lint`, `npm run typecheck`, `npm test` (113/113 pass: 5 shared + 68 API + 40 web), `npm run build`, `npm run test:api` (68/68 pass), `npm run test:db` (18/18 pass) all pass with zero errors.
+
+### Work Not Yet Started (Phase 06 to Phase 07)
 - [ ] Security, accessibility, and performance hardening audits (Phase 06).
 - [ ] Production deployments on Vercel and Node host with Supabase (Phase 07).
 
@@ -103,10 +117,10 @@
 |---|---|---|---|
 | **Linting** | `npm run lint` | **PASS** | Checked across workspaces; clean execution with 0 warnings. |
 | **Type Checking** | `npm run typecheck` | **PASS** | Strict TypeScript compiler verified across `shared`, `api`, `web` with 0 type errors. |
-| **Monorepo Tests** | `npm test` | **PASS** | 5 schema unit tests in `shared`, 64 tests in `api`, 32 tests in `web` (total 101 automated tests pass). |
-| **Frontend Unit Tests** | `npm --prefix apps/web test` | **PASS** | 32/32 tests pass covering design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, search, clearing, no-results state, media filtering, sorting, bookmark status filtering, empty states, poster fallbacks, honest Add Title preview behavior, modal dismissal, and responsive QA. |
-| **API Integration Tests** | `npm run test:api` | **PASS** | 64 tests pass in `apps/api` using Node test runner against isolated test database. |
-| **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources; Vite bundles client assets in ~866ms. |
+| **Monorepo Tests** | `npm test` | **PASS** | 5 schema unit tests in `shared`, 68 tests in `api`, 40 tests in `web` (total 113 automated tests pass). |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | **PASS** | 40/40 tests pass covering design tokens, glassmorphism fallback, shared UI components, router table, navigation boundaries, search, clearing, no-results state, media filtering, sorting, bookmark status filtering, empty states, poster fallbacks, honest Add Title preview behavior, modal dismissal, responsive QA, and Phase 05 workflows. |
+| **API Integration Tests** | `npm run test:api` | **PASS** | 68 tests pass in `apps/api` using Node test runner against isolated test database (includes auth, titles, collections, bookmarks, import, export, and resilience). |
+| **Production Build** | `npm run build` | **PASS** | All workspaces compile cleanly to `dist/` with declaration maps and sources; Vite bundles client assets in ~1.08s. |
 | **Database Verification** | `npm run test:db` | **PASS** | 18 assertions pass against live PostgreSQL: 10 tables, triggers, constraints, multi-collection membership, cascade deletions, and cross-owner RLS policies. |
 | **Git Safety** | `git status` | **PASS** | Clean staging; `.env`, `node_modules`, and build artifacts strictly ignored. |
 
@@ -117,32 +131,30 @@
 ### External Service Dependencies
 1. **Supabase PostgreSQL & Storage:**
    - Production / staging Supabase credentials (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_ANON_KEY`) needed when deploying to hosted Supabase.
-   - Storage bucket `covers` to be provisioned in hosted Supabase prior to Phase 05.
+   - Storage bucket `covers` to be provisioned in hosted Supabase prior to cloud deployment (URL-based artwork and gradient initials currently operational).
 2. **Jikan REST API v4:**
    - Upstream rate limits (~3 req/s) handled via in-memory throttler, bounded backoff, and TTL/LRU cache in Phase 03.
 
-### Decisions Resolved in Phase 01 & 02 & 03
+### Decisions Resolved in Phase 01 & 02 & 03 & 05
 - **ADR-001 (RLS Cross-Ownership Enforcement):** In `20261014000002_security_policies.sql`, relationship join tables enforce mutual ownership before inserting.
 - **ADR-006 (Case-Insensitive Collection Uniqueness):** Enforced via unique index `uq_collections_owner_lower_name ON collections(owner_id, lower(trim(name)))`.
 - **ADR-008 (Personal Rating Canonical Location):** Confirmed on `bookmarks.personal_rating` (numeric between 0.0 and 10.0).
 - **ADR-016 (Jikan Importer with Strict SSRF Defense, Bounded Cache, and Atomic Commit):** Documented in `decisions.md`.
+- **ADR-017 (Frontend Query & API Architecture):** Typed `ApiClient` class with TanStack Query caching and React context authentication.
+- **ADR-018 (Library Export Streaming):** JSON and CSV export endpoints stream user-scoped relational data without leaking secrets.
 
 ---
 
 ## 6. Next Approved Task & Acceptance Criteria
 
-### Next Task: Phase 05 — Product Workflows & End-to-End Integration (Pending Review & Authorization)
-**Prerequisite:** User review and formal approval of Phase 04 completion.
+### Next Task: Phase 06 — Hardening: Security, Accessibility, & Performance (Pending Review & Authorization)
+**Prerequisite:** User review and formal approval of Phase 05 completion.
 
-### Phase 05 Scope & Acceptance Criteria (Preview Only — Awaiting Authorization):
-1. Connect frontend React components to Express REST APIs using TanStack Query / typed API client.
-2. Implement full Title Catalog CRUD lifecycle (manual title creation, metadata editing, detail view, deletion).
-3. Implement Custom Collections management (create, update, delete collections; assign/remove titles across multiple collections).
-4. Implement Bookmarks tracking (watch/read status updates, chapter/episode progress sliders/inputs, 0.0–10.0 rating).
-5. Implement Cover Image upload pipeline to Supabase Storage `covers` bucket with validation and URL fallback.
-6. Implement Jikan MAL import workflow with interactive search, metadata preview, field editing, duplicate warning, and commit.
-7. Implement JSON and CSV library backup export endpoints and UI download triggers.
-8. Retain all security boundaries (owner scoping, JWT auth, SSRF protection).
+### Phase 06 Scope & Acceptance Criteria (Preview Only — Awaiting Authorization):
+1. Complete server-side SSRF safeguards and file signature verification.
+2. Conduct comprehensive accessibility (a11y) audit: full keyboard focus management, ARIA announcements, screen reader compatibility, and contrast compliance.
+3. Optimize glassmorphism rendering and CSS backdrop-filter performance on lower-power devices.
+4. Verify database backup and restore rehearsals.
 
 ---
 

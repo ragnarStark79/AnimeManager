@@ -69,16 +69,8 @@
    - When the backend connects via a privileged PostgreSQL connection (or Supabase service role), PostgreSQL table-level RLS policies are bypassed by the privileged role.
    - **Mitigation & Enforcement:** Backend service-layer authorization is strictly mandatory. All database queries in the repository layer enforce `owner_id = $x` in both reads and writes. Cross-owner references (e.g. attaching a title belonging to another user to one's own collection or bookmark) are blocked by explicit ownership validation queries before writes occur. In automated integration tests, attempts by Owner B to access or manipulate Owner A's records return 404 or 403.
 
-2. **Phase 04 Part 3 Scope & Demonstration Data Boundaries:**
-   - **Demo Dataset Scope:** The catalog records displayed on the Dashboard, Titles page, and Bookmarks page originate from the typed demonstration dataset (`src/data/demo.ts`, 12 items: 4 anime, 4 manga, 4 manhwa). These sample records are strictly isolated in memory and do not represent actual persisted user records.
-   - **Preview-Only Forms & Routes:**
-     - The `AddTitleModal` dialog and `CollectionsPage` new collection dialog are UI-only preview forms with disabled submit buttons ("Save Title (Phase 05)" and "Save Collection (Phase 05)") and non-persistence disclosures.
-     - The `/import` page clearly discloses that the interactive search and import workflow is coming in Phase 05, with the search action disabled in Phase 04.
-     - The `/settings` page provides clear UI disclosures for upcoming Phase 05 preferences and exports.
-   - **Modal Dismissal & Keyboard Navigation:** `AddTitleModal` and `CollectionsPage` modals support both backdrop click dismissal and `Escape` key dismissal. Search inputs in the Header and TitlesPage support `Escape` key blurring and clearing.
-   - **Header & Global Search Scope:** The global header search form submits queries to `/titles?q=...` to filter the demonstration dataset. Real backend search queries across the user's PostgreSQL database will be wired in Phase 05.
-   - **External Image Availability:** If external cover artwork URLs fail to load, `PosterCard` catches `onError` events and renders styled gradient placeholder cards with title initials.
-   - **Responsive Breakpoint Verification:** Responsive audits verified layouts across 360px and 390px (mobile 2-column poster grid, icon-only header add button, bottom mobile nav padding), 768px (tablet sidebar collapse, mobile nav trigger), 1024px (tablet/desktop transition, center pill hide to prevent collision), and 1440px (full desktop).
-   - **Full CRUD & API Integration:** Wiring React components to Express REST endpoints via TanStack Query/fetch, full database mutations, cover image uploads, and Jikan import workflows are strictly scheduled for Phase 05.
-
-
+2. **Phase 05 Full-Stack Integration & Storage Prerequisites:**
+   - **Real API Persistence:** Library catalog (`/titles`), custom collections (`/collections`), bookmarks (`/bookmarks`), and Jikan imports (`/import`) are connected to the live Express REST backend via TanStack Query and the typed `ApiClient`. User data is persisted to PostgreSQL and isolated by `owner_id`.
+   - **Demonstration Dataset Isolation:** The typed sample dataset (`src/data/demo.ts`) is retained exclusively for test suite backward compatibility and isolated test harness assertions. Authenticated views display live server data and explicit loading/error/empty states.
+   - **Supabase Storage Configuration Requirement:** Direct file uploads to Supabase Storage require an active Supabase project with the `covers` bucket created and public/authenticated read policies established. In local offline development environments without hosted Supabase Storage, cover images are handled via external URLs or rendered with the application's gradient initial placeholders.
+   - **Export Streaming:** JSON and CSV library exports are streamed directly from the Express backend via authenticated GET requests (`/api/v1/export/json` and `/api/v1/export/csv`), strictly scoped to the requesting owner and omitting credentials, signing keys, and secrets.

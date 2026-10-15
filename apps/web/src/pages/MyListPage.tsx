@@ -1,10 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Library, FolderKanban, ArrowRight, Info } from 'lucide-react';
-import { EmptyState, GlassCard } from '../components/ui';
+import { useQuery } from '@tanstack/react-query';
+import { Library, FolderKanban, ArrowRight, Info, Layers } from 'lucide-react';
+import { EmptyState, LoadingState, GlassCard, Button } from '../components/ui';
+import { api, type CollectionSummary } from '../lib/api-client';
 import './Placeholder.css';
 
 export function MyListPage() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => api.collections.list(),
+  });
+
+  const collections: CollectionSummary[] = data?.data || [];
+
   return (
     <div className="placeholder-page">
       <div className="placeholder-page-header">
@@ -35,39 +44,60 @@ export function MyListPage() {
         </span>
       </div>
 
-      {/* Navigation card to Collections */}
-      <GlassCard padding="md" className="mylist-nav-card">
-        <div className="mylist-nav-card-inner">
-          <div className="mylist-nav-icon" aria-hidden="true">
-            <FolderKanban size={24} />
-          </div>
-          <div className="mylist-nav-content">
-            <h2 className="mylist-nav-title">Collections</h2>
-            <p className="mylist-nav-desc">
-              Create and manage themed collections, curated groupings, and series
-              sagas. Your real collections will live here.
-            </p>
-          </div>
-          <Link
-            to="/collections"
-            className="mylist-nav-link"
-            aria-label="Go to Collections page"
-          >
-            <ArrowRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
-      </GlassCard>
+      {isLoading ? (
+        <LoadingState message="Loading your library collections..." />
+      ) : collections.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+          <h2 style={{ fontSize: 'var(--font-size-lg)', color: 'var(--color-text-primary)', margin: 0 }}>
+            Your Collections ({collections.length})
+          </h2>
 
-      <EmptyState
-        icon={<Library size={36} strokeWidth={1.5} />}
-        title="No collections yet"
-        description="Create a custom collection to organise your anime, manga, and manhwa into themed folders. Collections support multi-title membership."
-        action={
-          <Link to="/collections" className="btn btn--primary btn--md">
-            Create First Collection
-          </Link>
-        }
-      />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+              gap: 'var(--space-4)',
+            }}
+          >
+            {collections.map((col) => (
+              <GlassCard key={col.id} padding="md" className="collection-theme-card">
+                <div className="collection-theme-header">
+                  <span className="collection-theme-emoji" aria-hidden="true">
+                    {col.icon || '📁'}
+                  </span>
+                  <h3 className="collection-theme-title">{col.name}</h3>
+                </div>
+                <p className="collection-theme-desc">
+                  {col.description || 'Custom collection folder'}
+                </p>
+                <div className="collection-theme-footer">
+                  <span className="collection-theme-count">
+                    {col.titleCount} {col.titleCount === 1 ? 'title' : 'titles'}
+                  </span>
+                  <Link
+                    to="/collections"
+                    className="collection-theme-create-btn"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    View
+                  </Link>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Library size={36} strokeWidth={1.5} />}
+          title="No collections yet"
+          description="Create a custom collection to organise your anime, manga, and manhwa into themed folders. Collections support multi-title membership."
+          action={
+            <Link to="/collections" className="btn btn--primary btn--md">
+              Create First Collection
+            </Link>
+          }
+        />
+      )}
     </div>
   );
 }

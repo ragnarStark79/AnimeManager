@@ -1,9 +1,9 @@
 # AnimeManager — REST API Contracts
 
-**Document Version:** 1.2  
-**Base Path:** `/api/v1`  
-**Status:** Core APIs & Jikan Importer Implemented (Phase 01, Phase 02, & Phase 03)  
-**Implementation State:** Health, Titles, Collections, Bookmarks, and Jikan Importer Implemented; Uploads and Exports Pending (Phase 05)  
+**Document Version:** 1.3
+**Base Path:** `/api/v1`
+**Status:** Core APIs, Jikan Importer, and Exports Implemented (Phases 01, 02, 03, & 05)
+**Implementation State:** Health, Titles, Collections, Bookmarks, Jikan Importer, and Exports Implemented; Direct Cover Upload requires hosted Supabase Storage bucket
 
 ---
 

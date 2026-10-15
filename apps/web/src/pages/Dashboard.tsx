@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   BookOpen,
   Bookmark,
@@ -13,15 +14,12 @@ import {
   Clock,
   Sparkles,
   Clapperboard,
-  Info,
   type LucideIcon,
 } from 'lucide-react';
-import { GlassCard, PosterCard, Badge, AddTitleModal, FilterChips } from '../components/ui';
-import {
-  DEMO_TITLES,
-  filterByMediaType,
-  type MediaType,
-} from '../data/demo';
+import { PosterCard, Badge, AddTitleModal, FilterChips, LoadingState } from '../components/ui';
+import { api, type TitleSummary } from '../lib/api-client';
+import { DEMO_TITLES } from '../data/demo';
+import type { MediaType } from '@animemanager/shared';
 import './Dashboard.css';
 
 /* ── Category filter options (matching reference image aesthetic) ── */
@@ -36,11 +34,18 @@ const FILTER_OPTIONS: { value: DashboardFilter; label: string; icon: LucideIcon 
   { value: 'planning', label: 'Plan to Watch', icon: Clock },
 ];
 
-/* ─────────────────────────────────────────────────────────── */
-
 export function Dashboard() {
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>('all');
   const [addOpen, setAddOpen] = useState(false);
+
+  // Live library titles
+  const { data: titlesData, isLoading } = useQuery({
+    queryKey: ['titles'],
+    queryFn: () => api.titles.list({ pageSize: 50 }),
+  });
+
+  const liveTitles: TitleSummary[] = titlesData?.data || [];
+  const hasLiveTitles = liveTitles.length > 0;
 
   const filterOptions = FILTER_OPTIONS.map((opt) => ({
     value: opt.value,
@@ -49,25 +54,91 @@ export function Dashboard() {
   }));
 
   const filteredPosters = useMemo(() => {
+    if (hasLiveTitles) {
+      let filtered = [...liveTitles];
+      if (activeFilter === 'anime' || activeFilter === 'manga' || activeFilter === 'manhwa') {
+        filtered = filtered.filter((t) => t.mediaType === activeFilter);
+      } else if (activeFilter === 'trending') {
+        filtered = filtered.sort(
+          (a, b) => (b.bookmark?.personalRating ?? b.sourceScore ?? 0) - (a.bookmark?.personalRating ?? a.sourceScore ?? 0)
+        );
+      } else if (activeFilter === 'planning') {
+        filtered = filtered.filter((t) => t.bookmark?.status === 'plan_to_consume');
+      }
+      return filtered.slice(0, 6);
+    }
+
+    // Fallback showcase when library is new
     switch (activeFilter) {
       case 'all':
-        return DEMO_TITLES.slice(0, 6);
+        return DEMO_TITLES.slice(0, 6).map((d) => ({
+          id: d.titleId,
+          englishTitle: d.title,
+          mediaType: d.mediaType,
+          coverUrl: d.coverUrl,
+          releaseYear: d.year,
+          sourceScore: d.rating,
+          publicationStatus: d.bookmarkStatus,
+          bookmark: d.rating ? { personalRating: d.rating, status: d.bookmarkStatus as any } : null,
+        }));
       case 'trending':
-        return [...DEMO_TITLES].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 6);
+        return [...DEMO_TITLES]
+          .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+          .slice(0, 6)
+          .map((d) => ({
+            id: d.titleId,
+            englishTitle: d.title,
+            mediaType: d.mediaType,
+            coverUrl: d.coverUrl,
+            releaseYear: d.year,
+            sourceScore: d.rating,
+            publicationStatus: d.bookmarkStatus,
+            bookmark: d.rating ? { personalRating: d.rating, status: d.bookmarkStatus as any } : null,
+          }));
       case 'planning':
-        return DEMO_TITLES.filter((t) => t.bookmarkStatus === 'plan_to_consume').slice(0, 6);
+        return DEMO_TITLES.filter((t) => t.bookmarkStatus === 'plan_to_consume')
+          .slice(0, 6)
+          .map((d) => ({
+            id: d.titleId,
+            englishTitle: d.title,
+            mediaType: d.mediaType,
+            coverUrl: d.coverUrl,
+            releaseYear: d.year,
+            sourceScore: d.rating,
+            publicationStatus: d.bookmarkStatus,
+            bookmark: d.rating ? { personalRating: d.rating, status: d.bookmarkStatus as any } : null,
+          }));
       default:
-        return filterByMediaType(DEMO_TITLES, activeFilter as MediaType).slice(0, 6);
+        return DEMO_TITLES.filter((t) => t.mediaType === activeFilter)
+          .slice(0, 6)
+          .map((d) => ({
+            id: d.titleId,
+            englishTitle: d.title,
+            mediaType: d.mediaType,
+            coverUrl: d.coverUrl,
+            releaseYear: d.year,
+            sourceScore: d.rating,
+            publicationStatus: d.bookmarkStatus,
+            bookmark: d.rating ? { personalRating: d.rating, status: d.bookmarkStatus as any } : null,
+          }));
     }
-  }, [activeFilter]);
+  }, [activeFilter, liveTitles, hasLiveTitles]);
+
+  const spotlightAnime = hasLiveTitles
+    ? liveTitles.find((t) => t.mediaType === 'anime') || liveTitles[0]
+    : null;
+
+  const spotlightManhwa = hasLiveTitles
+    ? liveTitles.find((t) => t.mediaType === 'manhwa' || t.mediaType === 'manga') || liveTitles[1]
+    : null;
 
   const sectionTitle =
-    activeFilter === 'anime'    ? 'Anime in Sample Catalog' :
-    activeFilter === 'manga'    ? 'Manga in Sample Catalog' :
-    activeFilter === 'manhwa'   ? 'Manhwa in Sample Catalog' :
-    activeFilter === 'trending' ? 'Top Rated (Sample Catalog)' :
-    activeFilter === 'planning' ? 'Plan to Watch (Sample Catalog)' :
-    'Sample Catalog';
+    activeFilter === 'anime'    ? 'Anime Collection' :
+    activeFilter === 'manga'    ? 'Manga Collection' :
+    activeFilter === 'manhwa'   ? 'Manhwa Collection' :
+    activeFilter === 'trending' ? 'Top Rated' :
+    activeFilter === 'planning' ? 'Plan to Watch' :
+    'Recent Library Showcase';
 
   return (
     <div className="dashboard">
@@ -96,26 +167,37 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* ── Featured Hero Spotlight (Two cards side-by-side like reference image) ── */}
+      {/* ── Featured Hero Spotlight ── */}
       <section className="dashboard-spotlight-grid" aria-label="Featured spotlights">
-        {/* Spotlight Card 1: Anime */}
+        {/* Spotlight Card 1 */}
         <div className="spotlight-card spotlight-card--anime">
           <div className="spotlight-card-content">
             <div className="spotlight-badge-row">
-              <Badge variant="anime" size="sm">Sample: Anime</Badge>
-              <span className="spotlight-rating">
-                <Star size={12} fill="currentColor" aria-hidden="true" />
-                9.1
-              </span>
+              <Badge variant="anime" size="sm">
+                {spotlightAnime ? spotlightAnime.mediaType.toUpperCase() : 'ANIME SPOTLIGHT'}
+              </Badge>
+              {(spotlightAnime?.bookmark?.personalRating || spotlightAnime?.sourceScore) && (
+                <span className="spotlight-rating">
+                  <Star size={12} fill="currentColor" aria-hidden="true" />
+                  {(spotlightAnime.bookmark?.personalRating ?? spotlightAnime.sourceScore)?.toFixed(1)}
+                </span>
+              )}
             </div>
-            <h2 className="spotlight-title">Fullmetal Alchemist: Brotherhood</h2>
+            <h2 className="spotlight-title">
+              {spotlightAnime ? spotlightAnime.englishTitle : 'Frieren: Beyond Journey\'s End'}
+            </h2>
             <p className="spotlight-desc">
-              Two brothers search for the Philosopher's Stone after an attempt at human alchemy goes disastrously wrong.
+              {spotlightAnime?.synopsis
+                ? spotlightAnime.synopsis.slice(0, 150) + '...'
+                : 'An elf mage and her companions reflect on life, mortality, and journeys taken long ago.'}
             </p>
             <div className="spotlight-actions">
-              <Link to="/titles" className="spotlight-btn spotlight-btn--play">
+              <Link
+                to={spotlightAnime ? `/titles/${spotlightAnime.id}` : '/titles'}
+                className="spotlight-btn spotlight-btn--play"
+              >
                 <BookOpen size={14} aria-hidden="true" />
-                <span>View in Catalog</span>
+                <span>View Title</span>
               </Link>
               <Link to="/bookmarks" className="spotlight-btn spotlight-btn--glass">
                 <Bookmark size={14} aria-hidden="true" />
@@ -129,24 +211,35 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Spotlight Card 2: Manhwa */}
+        {/* Spotlight Card 2 */}
         <div className="spotlight-card spotlight-card--manhwa">
           <div className="spotlight-card-content">
             <div className="spotlight-badge-row">
-              <Badge variant="manhwa" size="sm">Sample: Manhwa</Badge>
-              <span className="spotlight-rating">
-                <Star size={12} fill="currentColor" aria-hidden="true" />
-                8.9
-              </span>
+              <Badge variant="manhwa" size="sm">
+                {spotlightManhwa ? spotlightManhwa.mediaType.toUpperCase() : 'MANHWA SPOTLIGHT'}
+              </Badge>
+              {(spotlightManhwa?.bookmark?.personalRating || spotlightManhwa?.sourceScore) && (
+                <span className="spotlight-rating">
+                  <Star size={12} fill="currentColor" aria-hidden="true" />
+                  {(spotlightManhwa.bookmark?.personalRating ?? spotlightManhwa.sourceScore)?.toFixed(1)}
+                </span>
+              )}
             </div>
-            <h2 className="spotlight-title">Solo Leveling</h2>
+            <h2 className="spotlight-title">
+              {spotlightManhwa ? spotlightManhwa.englishTitle : 'Solo Leveling'}
+            </h2>
             <p className="spotlight-desc">
-              Sung Jin-woo rises from the weakest E-rank hunter to humanity's greatest hope after discovering a hidden quest.
+              {spotlightManhwa?.synopsis
+                ? spotlightManhwa.synopsis.slice(0, 150) + '...'
+                : 'Sung Jin-woo rises from the weakest E-rank hunter to humanity\'s greatest hope after discovering a hidden quest.'}
             </p>
             <div className="spotlight-actions">
-              <Link to="/titles" className="spotlight-btn spotlight-btn--play">
+              <Link
+                to={spotlightManhwa ? `/titles/${spotlightManhwa.id}` : '/collections'}
+                className="spotlight-btn spotlight-btn--play"
+              >
                 <BookOpen size={14} aria-hidden="true" />
-                <span>View in Catalog</span>
+                <span>View Title</span>
               </Link>
               <Link to="/collections" className="spotlight-btn spotlight-btn--glass">
                 <FolderKanban size={14} aria-hidden="true" />
@@ -172,15 +265,6 @@ export function Dashboard() {
         />
       </section>
 
-      {/* ── Demo notice ── */}
-      <div className="dashboard-demo-notice" role="note">
-        <Info size={13} aria-hidden="true" />
-        <span>
-          <strong>Sample catalog</strong> — The titles below are demonstration data.
-          Your real library will appear here after backend connection in Phase 05.
-        </span>
-      </div>
-
       {/* ── Catalog Poster Grid ── */}
       <section className="dashboard-section" aria-labelledby="trending-heading">
         <div className="dashboard-section-header">
@@ -201,24 +285,26 @@ export function Dashboard() {
           </div>
         </div>
 
-        {filteredPosters.length > 0 ? (
+        {isLoading ? (
+          <LoadingState message="Loading catalog showcase..." />
+        ) : filteredPosters.length > 0 ? (
           <div className="dashboard-poster-grid">
             {filteredPosters.map((item) => (
               <PosterCard
-                key={item.titleId}
-                titleId={item.titleId}
-                title={item.title}
-                mediaType={item.mediaType}
-                coverUrl={item.coverUrl}
-                year={item.year}
-                rating={item.rating}
+                key={item.id}
+                titleId={item.id}
+                title={item.englishTitle}
+                mediaType={item.mediaType as any}
+                coverUrl={item.coverUrl || undefined}
+                year={item.releaseYear || undefined}
+                rating={item.bookmark?.personalRating ?? (item.sourceScore ?? undefined)}
               />
             ))}
           </div>
         ) : (
           <div className="dashboard-empty-filter">
             <p className="dashboard-empty-filter-msg">
-              No sample titles in this category.
+              No titles currently match this category in your library.
             </p>
             <button
               type="button"

@@ -4,6 +4,7 @@ import './GlassCard.css';
 interface GlassCardProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   onClick?: () => void;
   interactive?: boolean;
   padding?: 'none' | 'sm' | 'md' | 'lg';
@@ -14,6 +15,7 @@ interface GlassCardProps {
 export function GlassCard({
   children,
   className = '',
+  style,
   onClick,
   interactive = false,
   padding = 'md',
@@ -24,6 +26,7 @@ export function GlassCard({
 
   return (
     <Tag
+      style={style}
       className={[
         'glass-card-component',
         `glass-card-component--pad-${padding}`,

@@ -1,9 +1,9 @@
 # AnimeManager — System Architecture
 
-**Document Version:** 1.5
-**Status:** Frontend Verification, Responsive QA & Phase Gate Complete (Phase 04 Part 3)
-**Implementation State:** Phase 01, Phase 02, Phase 03, and Phase 04 (Parts 1, 2, 3) Complete (Database, Express API, Jikan Adapter, React Vite Glassmorphism Shell, Interactive Catalog UI, Responsive QA Verified across 360px–1440px)
-**Next Phase:** Phase 05 Product Workflows & End-to-End Integration (Pending user review and authorization)
+**Document Version:** 1.6
+**Status:** Full-Stack Integration & Core Library Workflows Complete (Phase 05)
+**Implementation State:** Phases 01, 02, 03, 04, and 05 Complete (PostgreSQL Schema, Express REST API, Resilient Jikan Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Jikan Import UI, JSON/CSV Export Endpoints & Triggers)
+**Next Phase:** Phase 06 Hardening: Security, Accessibility, & Performance (Pending user review and authorization)
 
 ---
 
