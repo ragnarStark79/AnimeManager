@@ -253,26 +253,30 @@ kill -9 <PID>
   3. In development mode (`import.meta.env.DEV`), the application automatically detects expired tokens and refreshes a fresh development session from `GET /api/v1/auth/dev-session`.
   4. In production, development sessions are strictly disabled (`ENABLE_DEV_AUTH=false`), and callers must provide valid authenticated Supabase session tokens.
 
-### Problem 6: Jikan Upstream Connection Timeout or Search Failure
-- **Symptom:** Import search on `http://localhost:5173/import` displays *"Upstream Connection Timed Out"* (HTTP 504).
-- **Root Cause:** The public Jikan API endpoint (`https://api.jikan.moe/v4` hosted at `135.181.39.91` by Hetzner in Helsinki) was **officially decommissioned on October 1, 2026**, causing TCP port 443 packets to be dropped.
-- **Diagnostics:**
-  Run the dedicated live Jikan diagnostic probe:
-  ```bash
-  npm run test:jikan:live
+### Problem 6: Metadata Importer Configuration & Upstream Diagnostics
+- **Context:** The public Jikan API host (`https://api.jikan.moe/v4`) was **decommissioned on October 1, 2026**. AnimeManager migrated to the **Tenrai v1 API** (`https://api.tenrai.org/v1`) in Phase 05.5, which restores full MyAnimeList search and preview capabilities. Full technical details are recorded in `IMPORT_PROVIDER_MIGRATION_REPORT.md`.
+- **Default Setup:**
+  The backend defaults to `https://api.tenrai.org/v1` automatically. To explicitly configure or override the endpoint in `.env`:
+  ```ini
+  METADATA_API_BASE_URL=https://api.tenrai.org/v1
   ```
-  This independently tests DNS A/AAAA resolution (OS and Google 8.8.8.8), TCP port 443 handshake, and live HTTP query attempts. Comprehensive diagnostic evidence is documented in `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md`.
-- **Solution & Workarounds:**
-  1. **Manual Entry Fallback:** All core library workflows (manual title entry via **Add Title**, collection organization, bookmark status tracking, and JSON/CSV exports) work 100% offline without external network dependencies.
-  2. **Self-Hosted Jikan Docker Instance:** To restore live MyAnimeList importing locally, run the official open-source Jikan v4 container:
-     ```bash
-     docker run -d --name jikan-rest -p 8080:8080 jikanme/jikan-rest:latest
-     ```
-     Then configure your local `.env`:
-     ```bash
-     JIKAN_BASE_URL=http://localhost:8080/v4
-     ```
-     Restart the API (`npm run dev`) and imports will query your local Jikan instance.
+- **Diagnostics:**
+  Run the live provider diagnostic probe to verify DNS, TLS, search, and detail endpoints:
+  ```bash
+  npm run test:metadata:live
+  ```
+- **Legacy Self-Hosted Fallback:**
+  If you prefer a private self-hosted Jikan v4 container instead of Tenrai, run:
+  ```bash
+  docker run -d --name jikan-rest -p 8080:8080 jikanme/jikan-rest:latest
+  ```
+  And configure `.env`:
+  ```ini
+  METADATA_API_BASE_URL=http://localhost:8080/v4
+  ```
+  Restart `npm run dev`.
+- **Offline Decoupling:**
+  All core library workflows (manual title entry via **Add Title**, collection organization, bookmark tracking, and CSV/JSON exports) remain 100% operational offline without any external metadata dependency.
 
 ---
 

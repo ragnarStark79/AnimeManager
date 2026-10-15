@@ -22,15 +22,16 @@
    - MyAnimeList catalogs Japanese manga, Korean manhwa, and Chinese manhua under a single `/manga/` taxonomy.
    - **Mitigation:** The import normalizer inspects the publication type. If the type is explicitly `"Manhwa"`, it preselects `manhwa`. If ambiguous, it flags `needsMediaConfirmation: true` and includes a warning requiring the user to explicitly select `manga` or `manhwa` before commit.
 
-4. **Public Jikan Server Retirement & Self-Hosted Option (Phase 05.4):**
-   - The primary public Jikan endpoint (`https://api.jikan.moe/v4`) was **officially decommissioned on October 1, 2026**. Port 443 TCP packets to Hetzner host `135.181.39.91` are dropped, triggering HTTP 504 timeouts.
-   - Full diagnostic findings and network socket traces are documented in the repository root report [JIKAN_IMPORT_DIAGNOSTIC_REPORT.md](file:///Users/ragnar/Documents/Projects/AnimeManager/JIKAN_IMPORT_DIAGNOSTIC_REPORT.md).
-   - **Mitigation & Diagnostics:**
-     - The backend classifies these failures as `UPSTREAM_TIMEOUT` and returns a standard HTTP 504 `EXTERNAL_PROVIDER_TIMEOUT` envelope with an actionable message.
-     - The frontend sanitizes all error displays and immediately hides stale candidates from prior searches.
-     - A zero-dependency diagnostic probe (`npm run test:jikan:live` via `scripts/test-jikan-live.js`) verifies DNS and TCP connectivity.
-     - **Self-Hosted Recovery:** Users can run a local private Jikan v4 Docker container (`docker run -d -p 8080:8080 jikanme/jikan-rest:latest`) and point `.env` to `JIKAN_BASE_URL=http://localhost:8080/v4`.
-     - Core library operations (manual title entry, collection organization, bookmark tracking, and CSV/JSON export) operate completely independently of upstream Jikan availability.
+4. **Public Jikan Server Retirement & Tenrai v1 Migration (Phase 05.5):**
+   - The primary public Jikan endpoint (`https://api.jikan.moe/v4`) was **officially decommissioned on October 1, 2026**, causing TCP port 443 packets to be dropped, as documented in [JIKAN_IMPORT_DIAGNOSTIC_REPORT.md](file:///Users/ragnar/Documents/Projects/AnimeManager/JIKAN_IMPORT_DIAGNOSTIC_REPORT.md).
+   - In Phase 05.5, AnimeManager migrated to **Tenrai v1 API** (`https://api.tenrai.org/v1`), the community alternative recommended by Jikan maintainers. Full details are documented in [IMPORT_PROVIDER_MIGRATION_REPORT.md](file:///Users/ragnar/Documents/Projects/AnimeManager/IMPORT_PROVIDER_MIGRATION_REPORT.md).
+   - **Tenrai Characteristics & Beta Status:**
+     - Tenrai provides verified Jikan-v4-compatible REST endpoints for the public MyAnimeList catalog.
+     - Public tier rate limits are 4 req/sec (250ms interval) and 120 req/min per IP address. AnimeManager's `RequestThrottler` (350ms interval ~2.8 rps) guarantees compliant throughput.
+     - User lists, user updates, and clubs are not supported in Tenrai v1.
+     - The backend `MetadataClient` supports both `METADATA_API_BASE_URL` (primary, pointing to Tenrai) and legacy `JIKAN_BASE_URL` (for private self-hosted Jikan instances).
+     - Live diagnostics can be run via `npm run test:metadata:live`.
+     - Core library operations (manual title entry, collection organization, bookmark tracking, and CSV/JSON export) operate completely independently of external metadata provider availability.
 
 ---
 

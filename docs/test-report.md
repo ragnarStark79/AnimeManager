@@ -1,8 +1,8 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 1.9
-**Phase:** Phase 05.2 (Authentication, JWT Lifecycle & Protected Workflow Repair)
-**Date:** 2026-10-15
+**Document Version:** 2.1
+**Phase:** Phase 05.5 (Tenrai Metadata Provider Migration & Live Import Verification)
+**Date:** 2026-10-16
 
 ---
 
@@ -12,49 +12,45 @@ This document serves as the authoritative, ongoing record of all automated test 
 
 During **Phase 01**, the monorepo workspace was established and verified. Database migrations, constraints, triggers, RLS policies, and seed fixtures were implemented and tested against a live PostgreSQL database (`animemanager_test`). All unit tests and database assertions passed with 100% success.
 
-During **Phase 02**, the Express REST backend was implemented with layered architecture (`app.ts`, `server.ts`, `config/`, `routes/`, `controllers/`, `services/`, `repositories/`, `middleware/`, `errors/`, `schemas/`), validated with Zod, and secured with Supabase JWT verification and owner scoping. An integration test suite using Node's test runner and Supertest verified all protected routes, cross-owner security boundaries, title CRUD and search, collection uniqueness and membership, bookmark tracking and upserts, and health endpoints. All 35 API integration tests passed with 100% success.
+During **Phase 02**, the Express REST backend was implemented with layered architecture (`app.ts`, `server.ts`, `config/`, `routes/`, `controllers/`, `services/`, `repositories/`, `middleware/`, `errors/`, `schemas/`), validated with Zod, and secured with Supabase JWT verification and owner scoping. All 35 API integration tests passed with 100% success.
 
-During **Phase 03**, the Jikan API v4 metadata importer and resilient adapter were implemented and thoroughly tested. The suite validates strict MyAnimeList URL parsing and adversarial SSRF prevention, resilient HTTP client behavior (bounded exponential backoff for 429/503, `Retry-After` header handling, timeouts, request throttling, and bounded TTL/LRU caching), metadata normalization (explicit manhwa classification, ambiguous type warnings, deduplication, and complete exclusion of community reviews), and atomic transactional commit enforcing server-side field selection and duplicate import prevention. All 64 API tests (unit and Supertest integration) and 5 shared schema tests passed with 100% success.
+During **Phase 03**, the Jikan API v4 metadata importer and resilient adapter were implemented and thoroughly tested. All 64 API tests (unit and Supertest integration) and 5 shared schema tests passed with 100% success.
 
 During **Phase 04 Parts 1–3**, the frontend visual foundation, interactive catalog UI, responsive design system, and QA stabilization were completed. The dark glassmorphism design system was verified across 360px–1440px viewports, 32 frontend tests passed, and clean production builds were verified.
 
-During **Phase 05**, full-stack integration and persistent core library workflows were implemented:
-- **TanStack Query & Typed API Client:** Installed `@tanstack/react-query` and created typed `ApiClient` (`apps/web/src/lib/api-client.ts`) with custom `ApiError` class, JWT header injection, and typed resource namespaces (`titles`, `collections`, `bookmarks`, `import`, `export`).
-- **Authentication & Owner Session Isolation:** Created `AuthProvider` and `useAuth` hook (`apps/web/src/lib/auth-context.tsx`) with localStorage token sync, JWT claims parsing (`sub`, `email`), and fallback dev token for offline workflows.
-- **Title CRUD & Detail View:** Implemented `TitleDetailPage` (`/titles/:id`) featuring hero banner, metadata stats, interactive bookmark tracking stepper, collection assignment picker, metadata edit modal, and confirmed delete modal (`DELETE /api/v1/titles/:id?confirm=true`). Upgraded `AddTitleModal` to persist titles via `api.titles.create` with full field coverage. Upgraded `TitlesPage` and `Dashboard` to fetch live data with search, media filtering, and sorting.
-- **Collections & My List:** Implemented collection CRUD and multi-collection title membership in `CollectionsPage` and `MyListPage`, upholding the core domain invariant that collection deletion never deletes titles or bookmarks.
-- **Bookmarks & Progress Tracking:** Implemented live bookmark tracking in `BookmarksPage` and `TitleDetailPage`, supporting status tabs, chapter/episode progress stepper, and personal ratings (0.0–10.0).
-- **Jikan Import Workflow:** Connected `ImportPage` to `/api/v1/import/jikan/search`, `/preview`, and `/commit` with candidate selection, metadata preview, editable fields, duplicate MAL import warning banners, manga vs manhwa disambiguation, and atomic commit navigation to `/titles/:id`.
-- **JSON & CSV Library Export:** Implemented streaming export endpoints in Express (`apps/api/src/routes/export.routes.ts`, `controllers/export.controller.ts`, `services/export.service.ts`) and download triggers in `SettingsPage`, strictly scoped to the requesting owner.
-- **Automated Verification:** Added `apps/web/test/phase05-workflows.test.js` (8 tests) and `apps/api/test/export.test.js` (4 tests). Total monorepo tests increased to 113/113 passing (5 shared + 68 API + 40 web).
+During **Phase 05**, full-stack integration and persistent core library workflows were implemented: TanStack Query & typed API client, JWT authentication & owner isolation, Title CRUD & detail view, collections & My List, bookmarks & progress tracking, metadata import workflow, streaming JSON/CSV library exports, and 113 automated tests.
 
-During **Phase 05.1**, local development startup and API proxy connectivity were stabilized and verified:
-- **Root Cause Resolution:** Diagnosed the `ECONNREFUSED` / HTTP 500 error: the Express backend process was never started when running `npm run dev` in `apps/web` alone, and macOS IPv6/IPv4 loopback resolution differences (`::1` vs `127.0.0.1`) caused connection refusals.
-- **Unified Startup:** Created `scripts/dev.js` (`npm run dev`) to compile API TypeScript and concurrently spawn Express API (port 4000) and Vite frontend (port 5173) with formatted terminal labels (`[api]`, `[web]`), graceful shutdown (`SIGINT`/`SIGTERM`), and port collision checks.
-- **Healthcheck & Connectivity Verification:** Created `scripts/healthcheck.js` (`npm run healthcheck`) to verify direct API health, PostgreSQL database connection readiness, and Vite proxy forwarding. Verified real HTTP requests across `/api/v1/health`, authenticated `/api/v1/titles`, `/collections`, and `/bookmarks`. All 113 automated tests pass cleanly.
+During **Phase 05.1**, local development startup and API proxy connectivity were stabilized: created `scripts/dev.js` (`npm run dev`) and `scripts/healthcheck.js` (`npm run healthcheck`).
 
-During **Phase 05.2**, authentication, JWT lifecycle, and protected workflows were repaired and thoroughly verified:
-- **Root Cause Resolution:** Diagnosed browser HTTP 401 (`Invalid or expired authentication token`) errors: static `VITE_AUTH_TOKEN` had expired, default fallback token signature was invalid, and browser `localStorage` persisted the expired token without validating `exp`.
-- **Guarded Dev Session Management:** Created guarded backend endpoint `GET /api/v1/auth/dev-session` (and `POST /api/v1/auth/dev-token`) issuing fresh 24h JWTs strictly bound to seeded owner `00000000-0000-0000-0000-000000000001`. Client-supplied owner IDs are strictly ignored. Guarded by `ENABLE_DEV_AUTH=true`; startup crashes with a fatal error if enabled in production.
-- **Frontend Token Lifecycle & Auto-Pruning:** Upgraded `ApiClient` and `AuthProvider` with `isTokenExpired()` detection, automatic `localStorage` cleanup on startup, automatic session acquisition in development mode, debounced 401 recovery (15s throttle) to prevent infinite loops, and mutation protection.
-- **Settings Page Visibility:** Displayed active session origin ("Local Development Session" badge vs "Authenticated Session"), active owner UUID, manual "Refresh Dev Session" button, and honest error banners.
-- **Secret Leak Prevention:** Verified zero backend signing secrets or service-role keys in production frontend bundles (`npm run build`).
-- **Regression Suite:** Added 3 backend auth tests (`apps/api/test/auth.test.js`) and 6 frontend lifecycle tests (`apps/web/test/auth-lifecycle.test.js`). Monorepo test count increased to 122/122 passing (5 shared + 71 API + 46 web).
+During **Phase 05.2**, authentication, JWT lifecycle, and protected workflows were repaired: guarded dev session endpoint (`GET /api/v1/auth/dev-session`), client token auto-pruning, and debounced 401 recovery.
+
+During **Phase 05.3**, Jikan import search error classification and resilience were upgraded: structured error categories, HTTP 504 timeouts vs 502 DNS failures, and diagnostic logging.
+
+During **Phase 05.4**, definitive Jikan network diagnostics established that the public hosted service at `api.jikan.moe` was officially discontinued and retired by its maintainers on October 1, 2026. Documented in `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md`.
+
+During **Phase 05.5**, AnimeManager successfully migrated from the discontinued Jikan public API to **Tenrai v1 API** (`https://api.tenrai.org/v1`):
+- **Live Provider Verification:** Tenrai DNS, TLSv1.3, anime/manga search, detail endpoints, and parameter validation were verified live via `scripts/test-tenrai-live.js` (`npm run test:metadata:live`).
+- **Provider-Neutral Adapter:** Refactored client into `MetadataClient` with safe `URL` and `URLSearchParams` building, inter-request rate limiting (350ms interval ~2.8 rps < 4 rps ceiling), caching, and backwards-compatible configuration fallbacks (`METADATA_API_BASE_URL` with `JIKAN_BASE_URL` fallback).
+- **Frontend Error Experience:** Upgraded `apps/web/src/pages/ImportPage.tsx` with granular error mapping (504, 502/503, 429, 401/403, 400/422, network), upstream request ID tracing, and direct "Create Title Manually Instead" fallback navigation.
+- **Live E2E Verification:** Verified live search for "Frieren" and "Naruto", preview generation, user title editing ("Naruto (Import Verified)"), atomic commit, duplicate prevention (409 Conflict), and offline manual title creation through the Vite development proxy (`:5173` -> `:4000` -> PostgreSQL).
+- **Comprehensive Documentation:** Produced repository-root deliverable `IMPORT_PROVIDER_MIGRATION_REPORT.md` documenting all 24 required technical sections.
+- **Test Metrics:** Monorepo automated test count increased to **139 / 139 passing** (5 shared + 83 API + 51 web), plus 18 database assertions = **157 total passing checks**.
 
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01 through 05.2)
+## 2. Quality Gate Verification Matrix (Phases 01 through 05.5)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces (shared, api, web) | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 71 API + 46 web tests pass (122 total) | **PASS** |
-| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, QA, Phase 05 workflows, and Phase 05.2 auth lifecycle | 46/46 frontend assertions pass cleanly | **PASS** |
-| **API Integration Tests**| `npm run test:api` | Node test runner executes integration, importer, export, and auth suites | 71/71 test assertions passed cleanly | **PASS** |
+| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 83 API + 51 web tests pass (139 total) | **PASS** |
+| **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, QA, Phase 05 workflows, auth lifecycle, and import workflows | 51/51 frontend assertions pass cleanly | **PASS** |
+| **API Integration Tests**| `npm run test:api` | Node test runner executes integration, importer, export, auth, and Tenrai adapter suites | 83/83 test assertions passed cleanly | **PASS** |
 | **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles; zero secret leaks in client assets | Built cleanly with type definitions and Vite client bundle; 0 leaks | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
+| **Live Metadata Diagnostics** | `npm run test:metadata:live` | Probes live DNS, TLS, search, and detail endpoints against Tenrai v1 | All 8 live checks pass with HTTP 200/400 | **PASS** |
 
 ---
 

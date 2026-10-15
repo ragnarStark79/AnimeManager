@@ -417,3 +417,29 @@
   - Reports actionable self-hosted Docker instructions if public host is down.
 - Added regression test in `apps/api/test/import-client.test.js` validating custom `JIKAN_BASE_URL` routing for private self-hosted Jikan instances.
 - Monorepo automated test count increased to **137 / 137 passing** (5 shared + 81 API + 51 web).
+
+### Phase 05.5: Migration from Discontinued Jikan API to Tenrai v1 & Live Import Recovery
+- Investigated official Jikan community recommendation ([jikan-me/jikan-rest#613](https://github.com/jikan-me/jikan-rest/issues/613)) and migrated to **Tenrai v1 API** (`https://api.tenrai.org/v1`), which serves Jikan v4-compatible REST endpoints for the public MyAnimeList catalog.
+- Conducted independent multi-layer live diagnostics verifying:
+  - DNS resolution to Cloudflare Anycast (`104.21.4.236`, `172.67.154.63`).
+  - TLSv1.3 handshake with Let's Encrypt certificate valid through Dec 2026.
+  - Live anime searches ("Frieren", "Naruto"), manga search ("Berserk"), manhwa search ("Solo Leveling"), full detail retrieval by ID, zero-result queries, and parameter validation.
+- Refactored `apps/api/src/services/import/jikan.client.ts` into a provider-neutral `MetadataClient` (retaining `JikanClient` backward-compatibility alias):
+  - Added safe URL construction using `new URL()` and `URLSearchParams` to prevent double-slashes or unwanted `/v4` concatenation.
+  - Integrated 350ms inter-request throttling (`RequestThrottler`) to comply with Tenrai's 4 rps public ceiling.
+  - Retained `BoundedTtlCache` with 5-minute TTL and failure cache exclusion.
+- Updated environment configuration (`apps/api/src/config/index.ts` & `.env.example`):
+  - Added `METADATA_API_BASE_URL` with default `https://api.tenrai.org/v1`.
+  - Added precedence-based fallback: respects legacy `JIKAN_BASE_URL` if set to a custom host (e.g., self-hosted Jikan container); automatically warns and falls back to Tenrai v1 if pointing to discontinued `api.jikan.moe`.
+- Upgraded frontend error handling in `apps/web/src/pages/ImportPage.tsx`:
+  - Granular error categorization (504 timeout, 502/503 service unavailable, 429 rate limit, 401/403 auth, 400/422 validation, network issues).
+  - Preserved upstream `requestId` in error alerts without leaking stack traces.
+  - Integrated direct "Create Title Manually Instead" fallback action across error and empty states.
+- Created `scripts/test-tenrai-live.js` (`npm run test:metadata:live`) providing automated live diagnostic verification across DNS, TLS, search, and detail endpoints.
+- Executed real live end-to-end integration test through Vite proxy (`:5173` -> `:4000` -> PostgreSQL):
+  - Verified live search, candidate preview, editorial title modification ("Naruto (Import Verified)"), and atomic commit to authenticated library (`00000000-0000-0000-0000-000000000001`).
+  - Verified duplicate prevention on re-commit (409 `DuplicateImportError`).
+  - Verified manual title creation remains 100% operational offline.
+- Created comprehensive root deliverable: **`IMPORT_PROVIDER_MIGRATION_REPORT.md`** containing all 24 required sections.
+- Added regression tests in `apps/api/test/import-client.test.js` validating `MetadataClient`, safe URLSearchParams construction, and whitespace query rejection.
+- Monorepo automated test count increased to **139 / 139 passing** (5 shared + 83 API + 51 web), plus 18 database assertions = **157 / 157 total passing checks**.

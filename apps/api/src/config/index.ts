@@ -43,7 +43,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   COVER_MAX_BYTES: z.coerce.number().int().positive().default(5242880),
-  JIKAN_BASE_URL: z.string().url().default('https://api.jikan.moe/v4'),
+  METADATA_API_BASE_URL: z.string().url().default('https://api.tenrai.org/v1'),
+  JIKAN_BASE_URL: z.string().url().optional(),
   REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
   IMPORT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
   IMPORT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
@@ -71,8 +72,37 @@ function loadConfig() {
     throw new Error('[Config Error] Fatal: ENABLE_DEV_AUTH cannot be enabled in production environments.');
   }
 
-  return result.data;
+  // Resolve effective metadata API base URL:
+  // 1. Explicit METADATA_API_BASE_URL takes precedence
+  // 2. Legacy JIKAN_BASE_URL is respected if not pointing to discontinued public api.jikan.moe
+  // 3. Verified default is Tenrai v1 API (https://api.tenrai.org/v1)
+  const defaultProviderUrl = 'https://api.tenrai.org/v1';
+  let effectiveMetadataUrl = defaultProviderUrl;
+
+  const rawMetadataUrl = process.env.METADATA_API_BASE_URL?.trim();
+  const rawJikanUrl = process.env.JIKAN_BASE_URL?.trim();
+
+  if (rawMetadataUrl) {
+    effectiveMetadataUrl = rawMetadataUrl;
+  } else if (rawJikanUrl) {
+    if (rawJikanUrl.includes('api.jikan.moe')) {
+      if (result.data.NODE_ENV !== 'test') {
+        console.warn(
+          '[Config Warning] JIKAN_BASE_URL points to discontinued api.jikan.moe. Falling back to Tenrai v1 (https://api.tenrai.org/v1).'
+        );
+      }
+      effectiveMetadataUrl = defaultProviderUrl;
+    } else {
+      effectiveMetadataUrl = rawJikanUrl;
+    }
+  }
+
+  return {
+    ...result.data,
+    METADATA_API_BASE_URL: effectiveMetadataUrl,
+    JIKAN_BASE_URL: effectiveMetadataUrl,
+  };
 }
 
-export type Config = z.infer<typeof envSchema>;
+export type Config = ReturnType<typeof loadConfig>;
 export const config: Config = loadConfig();

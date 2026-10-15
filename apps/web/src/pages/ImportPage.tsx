@@ -138,21 +138,52 @@ export function ImportPage() {
   });
 
   const getSearchErrorMessage = (err: unknown): string => {
-    if (!err) return 'MyAnimeList search is temporarily unavailable. Please try again shortly.';
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('fetch failed') || msg.includes('Failed to connect')) {
+    if (!err) {
       return 'MyAnimeList search is temporarily unavailable. Please try again shortly.';
     }
-    return msg;
+
+    const apiErr = err as any;
+    const statusCode = apiErr?.statusCode;
+    const requestId = apiErr?.requestId || apiErr?.meta?.requestId;
+    const reqSuffix = requestId ? ` (Request ID: ${requestId})` : '';
+
+    if (statusCode === 504) {
+      return `The metadata provider took too long to respond. You can retry the request or create the title manually.${reqSuffix}`;
+    }
+
+    if (statusCode === 502 || statusCode === 503) {
+      return `MyAnimeList search is temporarily unavailable. Please try again shortly.${reqSuffix}`;
+    }
+
+    if (statusCode === 429) {
+      return `Too many requests were sent to the metadata provider in a short period. Please wait a few moments and try again.${reqSuffix}`;
+    }
+
+    if (statusCode === 401 || statusCode === 403) {
+      return `Your session has expired or is invalid. Please sign in or refresh your session to continue.${reqSuffix}`;
+    }
+
+    if (statusCode === 400 || statusCode === 422) {
+      return (apiErr?.message || 'The search query or parameters were rejected. Please check your query and try again.') + reqSuffix;
+    }
+
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('fetch failed') || msg.includes('Failed to connect') || msg.includes('NetworkError')) {
+      return 'MyAnimeList search is temporarily unavailable. Please try again shortly.';
+    }
+
+    return (msg || 'MyAnimeList search is temporarily unavailable. Please try again shortly.') + reqSuffix;
   };
 
   const getSearchErrorTitle = (err: unknown): string => {
-    if (err && typeof err === 'object' && 'statusCode' in err) {
-      const code = (err as any).statusCode;
-      if (code === 504) return 'Upstream Connection Timed Out';
-      if (code === 502) return 'MyAnimeList Service Unavailable';
-      if (code === 429) return 'MyAnimeList Rate Limit Exceeded';
-    }
+    if (!err) return 'Search Failed';
+    const apiErr = err as any;
+    const statusCode = apiErr?.statusCode;
+    if (statusCode === 504) return 'Upstream Connection Timed Out';
+    if (statusCode === 502 || statusCode === 503) return 'MyAnimeList Service Unavailable';
+    if (statusCode === 429) return 'MyAnimeList Rate Limit Exceeded';
+    if (statusCode === 401 || statusCode === 403) return 'Authentication Required';
+    if (statusCode === 400 || statusCode === 422) return 'Invalid Search Query';
     return 'Search Failed';
   };
 
@@ -262,38 +293,65 @@ export function ImportPage() {
       {!previewDraft && (
         <>
           {isSearching ? (
-            <LoadingState message="Querying MyAnimeList via resilient adapter..." />
+            <LoadingState message="Querying MyAnimeList catalogue via Tenrai adapter..." />
           ) : searchError ? (
-            <ErrorState
-              title={getSearchErrorTitle(searchError)}
-              message={getSearchErrorMessage(searchError)}
-              onRetry={() => executeSearch().catch(() => {})}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <ErrorState
+                title={getSearchErrorTitle(searchError)}
+                message={getSearchErrorMessage(searchError)}
+                onRetry={() => executeSearch().catch(() => {})}
+              />
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/titles/new')}
+                >
+                  Create Title Manually Instead
+                </Button>
+              </div>
+            </div>
           ) : previewMutation.isPending ? (
             <LoadingState message="Fetching metadata draft and checking duplicate status..." />
           ) : previewMutation.isError ? (
-            <ErrorState
-              title="Preview Failed"
-              message={
-                previewMutation.error instanceof Error
-                  ? (previewMutation.error.message.includes('fetch failed')
-                      ? 'MyAnimeList metadata service is temporarily unavailable. Please try again shortly.'
-                      : previewMutation.error.message)
-                  : 'Failed to fetch title preview from MyAnimeList.'
-              }
-              onRetry={() => {
-                if (selectedCandidate) {
-                  handleCandidateSelect(selectedCandidate);
-                } else if (searchQuery.trim().startsWith('http')) {
-                  previewMutation.mutate({ url: searchQuery.trim() });
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <ErrorState
+                title="Preview Failed"
+                message={
+                  previewMutation.error instanceof Error
+                    ? (previewMutation.error.message.includes('fetch failed')
+                        ? 'MyAnimeList metadata service is temporarily unavailable. Please try again shortly.'
+                        : previewMutation.error.message)
+                    : 'Failed to fetch title preview from MyAnimeList.'
                 }
-              }}
-            />
+                onRetry={() => {
+                  if (selectedCandidate) {
+                    handleCandidateSelect(selectedCandidate);
+                  } else if (searchQuery.trim().startsWith('http')) {
+                    previewMutation.mutate({ url: searchQuery.trim() });
+                  }
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/titles/new')}
+                >
+                  Create Title Manually Instead
+                </Button>
+              </div>
+            </div>
           ) : hasSearched && candidates.length === 0 ? (
             <EmptyState
               icon={<Search size={36} strokeWidth={1.5} />}
               title="No candidates found"
-              description="No results matched your query on MyAnimeList. Try another title or check spelling."
+              description="No results matched your query on MyAnimeList. Try another title, check spelling, or add the title manually."
+              action={
+                <Button variant="secondary" size="sm" onClick={() => navigate('/titles/new')}>
+                  Create Title Manually
+                </Button>
+              }
             />
           ) : candidates.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>

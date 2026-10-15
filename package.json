@@ -22,6 +22,8 @@
     "test": "npm run --workspaces --if-present test",
     "test:api": "npm --prefix apps/api test",
     "test:db": "node scripts/verify-db.js",
+    "test:metadata:live": "node scripts/test-tenrai-live.js",
+    "test:tenrai:live": "node scripts/test-tenrai-live.js",
     "test:jikan:live": "node scripts/test-jikan-live.js"
   },
   "devDependencies": {

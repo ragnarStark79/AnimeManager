@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { JikanClient, classifyNetworkError } from '../dist/services/import/jikan.client.js';
+import { MetadataClient, JikanClient, classifyNetworkError } from '../dist/services/import/jikan.client.js';
 import { BoundedTtlCache } from '../dist/services/import/cache.js';
 import { RequestThrottler } from '../dist/services/import/throttler.js';
 import {
@@ -352,4 +352,47 @@ test('JikanClient: Custom baseUrl parameter routes requests to custom endpoint',
   const res = await client.search('anime', 'frieren');
   assert.ok(requestedUrl.startsWith('http://localhost:8080/v4/anime?q=frieren'));
   assert.equal(res.data[0].title, 'Custom Host Frieren');
+});
+
+test('MetadataClient: Constructs safe Tenrai /v1 URLs with URLSearchParams and never appends /v4', async () => {
+  let capturedSearchUrl = null;
+  let capturedDetailUrl = null;
+
+  const client = new MetadataClient({
+    baseUrl: 'https://api.tenrai.org/v1/', // includes trailing slash to test trimming
+    minIntervalMs: 0,
+    fetchFn: async (url) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/full')) {
+        capturedDetailUrl = urlStr;
+      } else {
+        capturedSearchUrl = urlStr;
+      }
+      return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    },
+  });
+
+  await client.search('anime', 'Sousou no Frieren & Magic', 1, 15);
+  assert.ok(capturedSearchUrl);
+  assert.ok(!capturedSearchUrl.includes('/v4/'), 'Must not concatenate /v4 to Tenrai base URL');
+  assert.ok(capturedSearchUrl.startsWith('https://api.tenrai.org/v1/anime?'));
+
+  const parsed = new URL(capturedSearchUrl);
+  assert.equal(parsed.pathname, '/v1/anime');
+  assert.equal(parsed.searchParams.get('q'), 'Sousou no Frieren & Magic');
+  assert.equal(parsed.searchParams.get('page'), '1');
+  assert.equal(parsed.searchParams.get('limit'), '15');
+
+  await client.getDetail('anime', 52991);
+  assert.ok(capturedDetailUrl);
+  assert.equal(capturedDetailUrl, 'https://api.tenrai.org/v1/anime/52991/full');
+  assert.ok(!capturedDetailUrl.includes('/v4/'));
+});
+
+test('MetadataClient: Throws BadRequestError for empty or whitespace-only search query', async () => {
+  const client = new MetadataClient({ minIntervalMs: 0 });
+  await assert.rejects(
+    () => client.search('anime', '   '),
+    (err) => err instanceof BadRequestError && err.statusCode === 400
+  );
 });

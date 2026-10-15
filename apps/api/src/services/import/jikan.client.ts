@@ -125,7 +125,7 @@ export function classifyNetworkError(err: unknown): {
   };
 }
 
-export interface JikanClientOptions {
+export interface MetadataClientOptions {
   baseUrl?: string;
   timeoutMs?: number;
   maxRetries?: number;
@@ -136,7 +136,9 @@ export interface JikanClientOptions {
   sleepFn?: (ms: number) => Promise<void>;
 }
 
-export class JikanClient {
+export type JikanClientOptions = MetadataClientOptions;
+
+export class MetadataClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
@@ -145,8 +147,8 @@ export class JikanClient {
   private readonly fetchFn: typeof fetch;
   private readonly sleepFn: (ms: number) => Promise<void>;
 
-  constructor(options: JikanClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? config.JIKAN_BASE_URL).replace(/\/+$/, '');
+  constructor(options: MetadataClientOptions = {}) {
+    this.baseUrl = (options.baseUrl ?? config.METADATA_API_BASE_URL ?? config.JIKAN_BASE_URL).replace(/\/+$/, '');
     this.timeoutMs = options.timeoutMs ?? config.REQUEST_TIMEOUT_MS;
     this.maxRetries = options.maxRetries ?? 2; // 1 initial + up to 2 retries = 3 total
     this.cache = new BoundedTtlCache(
@@ -159,7 +161,31 @@ export class JikanClient {
   }
 
   /**
-   * Search anime or manga candidates via Jikan v4.
+   * Constructs an upstream request URL safely using URL and URLSearchParams.
+   * Defends against malformed paths, double-slashes, and unintended /v4 concatenation.
+   */
+  private buildRequestUrl(
+    mediaType: 'anime' | 'manga',
+    subPath?: string | number,
+    queryParams?: Record<string, string | number | undefined>
+  ): string {
+    const cleanBase = this.baseUrl.replace(/\/+$/, '');
+    const path = subPath !== undefined ? `${mediaType}/${subPath}` : mediaType;
+    const url = new URL(`${cleanBase}/${path}`);
+
+    if (queryParams) {
+      for (const [key, value] of Object.entries(queryParams)) {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.set(key, String(value));
+        }
+      }
+    }
+
+    return url.toString();
+  }
+
+  /**
+   * Search anime or manga candidates via provider-neutral API.
    */
   async search(
     mediaType: 'anime' | 'manga',
@@ -182,7 +208,11 @@ export class JikanClient {
       return cached;
     }
 
-    const url = `${this.baseUrl}/${mediaType}?q=${encodeURIComponent(trimmed)}&page=${safePage}&limit=${safeLimit}`;
+    const url = this.buildRequestUrl(mediaType, undefined, {
+      q: trimmed,
+      page: safePage,
+      limit: safeLimit,
+    });
     const data = await this.fetchWithResilience(url, context);
 
     this.cache.set(cacheKey, data);
@@ -207,7 +237,7 @@ export class JikanClient {
       return cached;
     }
 
-    const url = `${this.baseUrl}/${mediaType}/${id}/full`;
+    const url = this.buildRequestUrl(mediaType, `${id}/full`);
     const data = await this.fetchWithResilience(url, context);
 
     this.cache.set(cacheKey, data);
@@ -361,7 +391,7 @@ export class JikanClient {
 
         if (config.NODE_ENV !== 'test') {
           console.error(
-            `[Jikan Upstream Error] requestId=${context?.requestId || 'none'} category=${classification.category} attempt=${attempt}/${this.maxRetries + 1} elapsed=${elapsed}ms reason="${classification.rawReason}"`
+            `[Metadata Upstream Error] requestId=${context?.requestId || 'none'} category=${classification.category} attempt=${attempt}/${this.maxRetries + 1} elapsed=${elapsed}ms reason="${classification.rawReason}"`
           );
         }
 
@@ -393,4 +423,7 @@ export class JikanClient {
   }
 }
 
-export const jikanClient = new JikanClient();
+// Canonical exported singleton and backwards-compatible aliases
+export { MetadataClient as JikanClient };
+export const metadataClient = new MetadataClient();
+export const jikanClient = metadataClient;
