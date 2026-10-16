@@ -106,6 +106,25 @@ export function errorHandler(
     return;
   }
 
+  // Handle database connection and reachability failures (predictable HTTP 503)
+  if (isDatabaseConnectivityError(err)) {
+    if (config.NODE_ENV !== 'test') {
+      const sanitizedSummary = err instanceof Error ? err.message.split('\n')[0] : 'Unknown database error';
+      console.error(
+        `[Database Connectivity Error] [${requestId}] Database unreachable (${pgErr.code || 'NO_CODE'}): ${sanitizedSummary}`
+      );
+    }
+    res.status(503).json({
+      error: {
+        code: 'DATABASE_UNAVAILABLE',
+        message: 'The database service is temporarily unavailable. Please verify network connectivity.',
+        details: [],
+      },
+      meta: { requestId, timestamp },
+    });
+    return;
+  }
+
   // Unexpected internal server error (never leak stack traces or connection strings)
   if (config.NODE_ENV !== 'test') {
     console.error(`[Unhandled Error] [${requestId}]`, err);
@@ -123,3 +142,40 @@ export function errorHandler(
     },
   });
 }
+
+export function isDatabaseConnectivityError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; message?: string };
+
+  const networkCodes = ['ECONNREFUSED', 'EHOSTUNREACH', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET', 'EPIPE'];
+  if (e.code && networkCodes.includes(e.code)) return true;
+
+  const pgConnCodes = [
+    '28P01', // password authentication failed
+    '28000', // invalid authorization specification
+    '08000', // connection exception
+    '08003', // connection does not exist
+    '08006', // connection failure
+    '08001', // sqlclient unable to establish connection
+    '08004', // server rejected connection
+    '57P01', // admin shutdown
+    '57P02', // crash shutdown
+    '57P03', // cannot connect now
+    'XX000', // internal server error / pooler tenant error
+  ];
+  if (e.code && pgConnCodes.includes(e.code)) return true;
+
+  const msg = typeof e.message === 'string' ? e.message : '';
+  if (
+    msg.includes('Connection terminated unexpectedly') ||
+    msg.includes('timeout exceeded when connecting') ||
+    msg.includes('connect ECONNREFUSED') ||
+    msg.includes('connect EHOSTUNREACH') ||
+    msg.includes('tenant/user')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+

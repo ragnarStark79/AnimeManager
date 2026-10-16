@@ -324,6 +324,8 @@ export function ImportPage() {
                         : previewMutation.error.message)
                     : 'Failed to fetch title preview from MyAnimeList.'
                 }
+
+
                 onRetry={() => {
                   if (selectedCandidate) {
                     handleCandidateSelect(selectedCandidate);

@@ -16,6 +16,13 @@ export const pool = new Pool({
   ssl: isRemote ? { rejectUnauthorized: false } : undefined,
 });
 
+pool.on('error', (err) => {
+  if (config.NODE_ENV !== 'test') {
+    console.error('[AnimeManager DB Pool] Unexpected error on idle client:', err.message);
+  }
+});
+
+
 export interface DbHealthDetailed {
   connected: boolean;
   schemaReady: boolean;

@@ -475,3 +475,26 @@
   - Added 6 new automated tests verifying rate limiter headers, request threshold, user key isolation, 413 payload limit guard, JWT `none` algorithm rejection, and CORS headers.
   - Total monorepo automated test count increased to **145 / 145 passing** (5 shared + 89 API + 51 web), plus 18 database assertions = **163 total passing checks**.
 - Delivered comprehensive root deliverable: **`PHASE_06_HARDENING_REPORT.md`** (uncommitted).
+
+### Phase 06.2: Supabase Dual-Stack Pooler Connectivity & Preview Error Resolution
+- **Root Cause Diagnosed & Verified:**
+  - Direct connection endpoint (`db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`) is IPv6-only (`AAAA: 2406:da14:18fe:3101::9ecd`), with `ENODATA` for IPv4 A records.
+  - Cellular mobile hotspots provide native IPv6 routing or NAT64/DNS64, enabling direct connections to succeed. Standard broadband/Wi-Fi networks lacking IPv6 default routing failed with `connect EHOSTUNREACH 2406:da14:18fe:3101::9ecd:5432` or `ECONNREFUSED`.
+  - When the database connection failed, metadata search still worked because Tenrai is an external REST API, but `/api/v1/import/preview` failed with HTTP 500 because preview performs duplicate lookups against the local database (`SELECT es.title_id FROM external_sources...`).
+  - Unhandled database connectivity errors fell through to generic 500 `INTERNAL_ERROR` envelopes.
+- **Supabase Dual-Stack Pooler Configuration:**
+  - Identified project region as Tokyo (`ap-northeast-1`).
+  - Connected via Supabase Supavisor pooler at `aws-0-ap-northeast-1.pooler.supabase.com:5432` (Session mode, recommended for Node.js `pg.Pool` persistent connections) with user format `postgres.wbukfeqpsjwyaixwmpnc`.
+  - Verified instant IPv4/IPv6 dual-stack connectivity and transactions on both port 5432 and port 6543.
+- **API Error Handling & Service Availability:**
+  - Added `isDatabaseConnectivityError` in `apps/api/src/middleware/error.middleware.ts` to detect network codes (`ECONNREFUSED`, `EHOSTUNREACH`, `ETIMEDOUT`, `ENOTFOUND`) and Postgres connection drop codes (`28P01`, `08006`, `57P01`, `XX000`).
+  - Maps database connectivity outages to structured HTTP 503 `DATABASE_UNAVAILABLE` without exposing raw database error strings, passwords, or stack traces.
+  - Genuine non-connectivity errors continue to return HTTP 500 `INTERNAL_ERROR`.
+  - Added idle client error listener to `pool` in `apps/api/src/repositories/db.ts` to prevent process crashes on idle connection resets.
+- **Health Liveness vs Readiness Distinction:**
+  - Mounted `/api/v1/health/liveness` returning HTTP 200 `{ status: 'alive' }` as long as Express is operational.
+  - Updated `/api/v1/health` and `/api/v1/health/readiness` to report `liveness: 'alive'` and `readiness: 'ready' | 'unready'`.
+- **Automated Regression Suite (`apps/api/test/connectivity-regression.test.js`):**
+  - Added 11 automated regression tests covering liveness/readiness, 503 error envelopes for titles, collections, bookmarks, and preview, 500 preservation for internal errors, working database preview and commit with duplicate detection, atomic rollback verification, and pool safety.
+  - Total monorepo automated test count increased to **159 / 159 passing** (5 shared + 103 API + 51 web), plus 18 database assertions = **177 total passing checks**.
+- Delivered comprehensive root deliverable: **`PHASE_06_2_DATABASE_CONNECTIVITY_REPORT.md`** (uncommitted).
