@@ -445,3 +445,33 @@
 - Created comprehensive root deliverable: **`IMPORT_PROVIDER_MIGRATION_REPORT.md`** containing all 24 required sections.
 - Added regression tests in `apps/api/test/import-client.test.js` validating `MetadataClient`, safe URLSearchParams construction, and whitespace query rejection.
 - Monorepo automated test count increased to **139 / 139 passing** (5 shared + 83 API + 51 web), plus 18 database assertions = **157 / 157 total passing checks**.
+
+### Phase 06: Production Hardening, Security Audit & Release Readiness
+- **Server-Side API Rate Limiting (`apps/api/src/middleware/rate-limit.middleware.ts`):**
+  - Implemented configurable sliding-window `RateLimiter` class tracking requests per authenticated user ID or client IP address.
+  - Automatically manages standard rate-limit headers: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`.
+  - When limit exceeded, injects standard `Retry-After` header and throws `RateLimitError` returning structured HTTP 429 payload with `RATE_LIMITED` error code.
+  - Attached to all external import endpoints (`/api/v1/import/jikan/search`, `/api/v1/import/preview`, `/api/v1/import/commit`) using `IMPORT_RATE_LIMIT_WINDOW_MS` (60,000ms) and `IMPORT_RATE_LIMIT_MAX` (20 req/min).
+  - Background memory cleanup timer is unreferenced to prevent hanging process exits in test environments.
+- **Payload Too Large Defense (`apps/api/src/middleware/error.middleware.ts`):**
+  - Added dedicated catch in `errorHandler` for body-parser `entity.too.large` events.
+  - Returns HTTP 413 `PAYLOAD_TOO_LARGE` with structured error envelope and request ID instead of falling through to unhandled 500 error.
+  - Exported `PayloadTooLargeError` and `RateLimitError` classes in `apps/api/src/errors/index.ts`.
+- **Production Secret Validation (`apps/api/src/config/index.ts`):**
+  - Added strict production startup guard: in `NODE_ENV === 'production'`, application throws a fatal configuration error if `SUPABASE_JWT_SECRET` equals the default development fallback string (`development-jwt-secret-min-16-chars-long!`).
+  - Retained strict production guards against `ENABLE_DEV_AUTH === true` and localhost database targets.
+- **JWT HS256 Algorithm Enforcement (`apps/api/src/middleware/auth.middleware.ts`):**
+  - Enforced `{ algorithms: ['HS256'] }` parameter on `jwt.verify` to strictly prevent algorithm confusion attacks (e.g. `none` algorithm tokens or unexpected public-key substitutions).
+- **CORS Multi-Origin Support (`apps/api/src/app.ts`):**
+  - Enhanced CORS origin handler to parse comma-separated strings (e.g. `http://localhost:5173,https://myanimemanager.com`) into an array of trimmed, allowed origins.
+- **Vite Bundle Splitting & Performance Optimization (`apps/web/vite.config.ts`):**
+  - Configured Rollup `manualChunks` dividing vendor bundles into dedicated chunks: `vendor-react` (React, ReactDOM, React Router), `vendor-query` (TanStack Query), `vendor-icons` (Lucide React).
+  - Eliminated the monolithic 662 kB chunk warning; application JS dropped to ~245 kB, and all vendor chunks are cleanly cached under 320 kB.
+- **Accessibility Hardening (`apps/web/src/components/layout/AppShell.tsx` & `.css`):**
+  - Added accessible, keyboard-focusable "Skip to main content" anchor link (`.skip-to-content`) targeting `<main id="main-content">`.
+  - Verified `:focus-visible` styling across interactive buttons, inputs, and dialogs.
+  - Verified semantic `<dialog>` modal implementations in `AddTitleModal` with focus trapping, backdrop dismissal, and Escape key listener.
+- **Automated Regression Suite (`apps/api/test/hardening.test.js`):**
+  - Added 6 new automated tests verifying rate limiter headers, request threshold, user key isolation, 413 payload limit guard, JWT `none` algorithm rejection, and CORS headers.
+  - Total monorepo automated test count increased to **145 / 145 passing** (5 shared + 89 API + 51 web), plus 18 database assertions = **163 total passing checks**.
+- Delivered comprehensive root deliverable: **`PHASE_06_HARDENING_REPORT.md`** (uncommitted).

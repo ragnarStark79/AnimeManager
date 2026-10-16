@@ -1,9 +1,9 @@
 # AnimeManager — System Architecture
 
-**Document Version:** 2.0
-**Status:** Supabase PostgreSQL Integration, Remote Migrations & Persistence Complete (Phase 05.6)
-**Implementation State:** Phases 01, 02, 03, 04, 05, 05.1, 05.2, 05.3, 05.4, 05.5, and 05.6 Complete (PostgreSQL Schema, Express REST API, Tenrai Metadata Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Import UI, JSON/CSV Export Endpoints, Hosted Supabase PostgreSQL 17.11 Persistence, Remote Idempotent Migrations, Strict Tenant Scoping, Schema-Aware Health Probes)
-**Next Phase:** Phase 06 Hardening: Security, Accessibility, & Performance (Pending user review and authorization; Phase 05.6 stop condition enforced)
+**Document Version:** 2.1
+**Status:** Production Hardening, Security Audit & Release Readiness Complete (Phase 06)
+**Implementation State:** Phases 01, 02, 03, 04, 05, 05.1, 05.2, 05.3, 05.4, 05.5, 05.6, and 06 Complete (PostgreSQL Schema, Express REST API, Tenrai Metadata Adapter, React Vite Glassmorphism Shell, TanStack Query API Client, AuthProvider, Title CRUD & Detail View, Collections & My List, Bookmarks & Progress Tracking, Import UI, JSON/CSV Export Endpoints, Hosted Supabase PostgreSQL 17.11 Persistence, Remote Idempotent Migrations, Strict Tenant Scoping, Schema-Aware Health Probes, In-Memory Sliding-Window Rate Limiter, 413 Payload Limit Defense, HS256 JWT Algorithm Whitelist, Production Secret Validation, Multi-Origin CORS, Vite Rollup Manual Chunks, Accessible Skip-to-Content Navigation)
+**Next Phase:** Phase 07: Deployment Preparation & Production Verification (Pending user review and authorization; Phase 06 stop condition strictly enforced; no deployment performed)
 
 ---
 
@@ -432,3 +432,29 @@ sequenceDiagram
 - **Client Override Immunity:** The dev token controller unconditionally binds issued tokens to seeded owner `00000000-0000-0000-0000-000000000001`. Client-supplied `ownerId` parameters in the body or query are strictly ignored.
 - **Zero Frontend Secret Exposure:** Neither `JWT_SECRET` nor `SUPABASE_SERVICE_ROLE_KEY` is ever prefixed with `VITE_` or embedded into client assets. Static analysis during `npm run build` verifies zero matches across output bundles.
 - **Debounced 401 Auto-Recovery:** The frontend throttles automated dev session renewal to once per 15 seconds. If a token fails, mutations (`POST`/`PUT`/`DELETE`) are never retried automatically to prevent duplicate record creation.
+
+---
+
+## 8. Phase 06 Production Hardening & Security Defenses
+
+### 1. Sliding-Window API Rate Limiting
+- **Implementation:** `apps/api/src/middleware/rate-limit.middleware.ts` implements an in-memory `RateLimiter` class configured for `/api/v1/import` routes (`IMPORT_RATE_LIMIT_WINDOW_MS: 60000`, `IMPORT_RATE_LIMIT_MAX: 20`).
+- **Identity Scoping:** Keyed on `user:${req.user.id}` for authenticated requests, falling back to client IP address (`req.ip`).
+- **Standard Headers:** Sets `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` on every response.
+- **Throttling & Backoff:** When limit is exceeded, sets `Retry-After: <seconds>` and throws `RateLimitError` returning HTTP 429 with `{ error: { code: 'RATE_LIMITED', message, details: [{ retryAfterSeconds, limit, windowSeconds }] } }`.
+- **Memory Safety:** Automatically purges expired records at regular intervals using an unreferenced timer (`timer.unref()`), preventing node event loop retention.
+
+### 2. Request Body & Payload Limit Protections
+- **Body Parser Limits:** Express body parser enforces strict `limit: '1mb'` on incoming JSON.
+- **Payload Too Large (413):** `apps/api/src/middleware/error.middleware.ts` intercepts body-parser `entity.too.large` events and returns standard HTTP 413 `PAYLOAD_TOO_LARGE` envelopes with request IDs, preventing 500 error leakages.
+
+### 3. JWT Security & Cryptographic Algorithm Whitelist
+- **Algorithm Whitelisting:** `apps/api/src/middleware/auth.middleware.ts` passes `{ algorithms: ['HS256'] }` to `jwt.verify()`, explicitly preventing algorithm confusion attacks (e.g. `none` algorithm tokens or asymmetric key confusion).
+- **Production Secret Guard:** `apps/api/src/config/index.ts` enforces that in `NODE_ENV === 'production'`, `SUPABASE_JWT_SECRET` cannot match the default fallback string (`development-jwt-secret-min-16-chars-long!`), throwing a fatal startup error if detected.
+
+### 4. Cross-Origin Resource Sharing (CORS) Multi-Origin Support
+- **Dynamic Origin Resolution:** `apps/api/src/app.ts` parses comma-delimited `CORS_ORIGIN` strings into an array of allowed origins, permitting both local development frontends and remote production domains simultaneously.
+
+### 5. Frontend Bundle Optimization & Accessibility
+- **Rollup Manual Chunks:** `apps/web/vite.config.ts` partitions vendor packages into dedicated chunks (`vendor-react`, `vendor-query`, `vendor-icons`), keeping all chunks under 320 kB and eliminating Vite build warnings.
+- **Skip Navigation:** `AppShell.tsx` includes an accessible keyboard "Skip to main content" link (`.skip-to-content`) targeting `<main id="main-content">`, ensuring full keyboard and screen-reader accessibility.

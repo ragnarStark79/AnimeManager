@@ -96,13 +96,16 @@ function loadConfig() {
     sanitizedDbHost = 'invalid-connection-string';
   }
 
-  // Strict Security Guard: Never allow development auth or localhost database in production
+  // Strict Security Guard: Never allow development auth, localhost database, or default dev JWT secret in production
   if (result.data.NODE_ENV === 'production') {
     if (result.data.ENABLE_DEV_AUTH === true) {
       throw new Error('[Config Error] Fatal: ENABLE_DEV_AUTH cannot be enabled in production environments.');
     }
     if (databaseTarget === 'local_postgres') {
       throw new Error('[Config Error] Fatal: Production environment cannot use localhost PostgreSQL.');
+    }
+    if (result.data.SUPABASE_JWT_SECRET === 'development-jwt-secret-min-16-chars-long!') {
+      throw new Error('[Config Error] Fatal: Insecure default SUPABASE_JWT_SECRET cannot be used in production environments.');
     }
   }
 

@@ -1,7 +1,7 @@
 # AnimeManager — Known Limitations & Scope Constraints
 
-**Document Version:** 1.6
-**Phase:** Phase 05.4 (Definitive Jikan Connectivity Diagnosis, Import Recovery & Technical Report)
+**Document Version:** 1.7
+**Phase:** Phase 06 (Production Hardening, Security Audit & Release Readiness)
 **Status:** Documented & Verified
 
 ---
@@ -68,7 +68,9 @@
 
 2. **Hosted Supabase PostgreSQL & Connection Routing (Phase 05.6):**
    - The application now supports both local PostgreSQL (for isolated unit/integration tests) and hosted Supabase PostgreSQL (for production and remote staging).
-   - **Direct IPv6 vs Pooler Routing:** The direct connection endpoint (`db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`) resolves over IPv6 (`AAAA`). On environments with native IPv6 routing, direct connections operate with low latency (393ms handshake). For environments lacking IPv6 egress, Supabase's Supavisor connection pooler (`aws-0-ap-southeast-1.pooler.supabase.com:6543`) is fully supported and documented in `.env.example`.
+   - **Direct IPv6 vs Pooler Routing:** The direct connection endpoint (`db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`) resolves over IPv6 (`AAAA: 2406:da14:18fe:3101::9ecd`). On networks with native IPv6 routing (such as mobile cellular hotspots), direct connections operate with low latency. On broadband/corporate networks lacking native IPv6 routing, direct connections fail with `EHOSTUNREACH`.
+   - **Dual-Stack Pooler Resolution:** The Supabase Supavisor connection pooler (`aws-0-ap-northeast-1.pooler.supabase.com`) in Tokyo provides dual-stack IPv4/IPv6 support on port `5432` (Session mode, recommended for Node.js `pg.Pool`) and port `6543` (Transaction mode). Username format is `postgres.<project-ref>` (e.g. `postgres.wbukfeqpsjwyaixwmpnc`).
+   - **Degraded Startup & Service Availability:** If PostgreSQL is unreachable, the API marks itself as `degraded` and responds to database-dependent routes with structured HTTP 503 `DATABASE_UNAVAILABLE` envelopes, while `/api/v1/health/liveness` reports application process liveness.
    - **Remote Verification Safety Guard:** To prevent test suites from running against production databases, remote tests require `ALLOW_REMOTE_DB_TESTS=true` (`npm run test:supabase:remote` and `npm run test:supabase:workflows`). Standard `npm test` and `npm run test:db` automatically target local PostgreSQL.
 
 3. **Browser Automation in Sandboxed CI/Dev Environment:**
@@ -94,3 +96,8 @@
    - **Option B Local Development Strategy:** To support local full-stack development without requiring active remote Supabase credentials, the backend provides a development session endpoint (`GET /api/v1/auth/dev-session`) guarded by `ENABLE_DEV_AUTH=true`. This endpoint issues short-lived (24h) JWTs strictly bound to the seeded local owner (`00000000-0000-0000-0000-000000000001`), ensuring compatibility with seed fixtures and automated test databases.
    - **Production Isolation:** If `ENABLE_DEV_AUTH=true` is present when `NODE_ENV=production`, the backend throws a fatal configuration exception during boot. Test signing secrets are never used in production, and dev token issuance routes return 404/disabled when running in production mode.
    - **Frontend Expiration Pruning:** Stale or expired tokens in browser `localStorage` are automatically detected via `isTokenExpired()` and cleared on client startup, avoiding recurring 401 loops. Automatic renewal is debounced to 15-second intervals, and state-mutating requests (`POST`/`PUT`/`DELETE`) are never repeated automatically after an authentication error.
+
+4. **In-Memory Rate Limiting Scope (Phase 06):**
+   - **Characteristics:** The Phase 06 rate limiter (`apps/api/src/middleware/rate-limit.middleware.ts`) operates in-memory using Node.js Maps with sliding time windows. It is completely zero-dependency, self-contained, and imposes zero latency overhead.
+   - **Multi-Instance Limitation:** In horizontally autoscaled deployments with multiple separate backend node processes behind a round-robin load balancer, in-memory rate limits are tracked per process rather than globally across the cluster.
+   - **Production Recommendation:** For single-instance container deployments (Fly.io, Railway, standard VPS), the in-memory limiter provides complete protection. For horizontally scaled multi-instance clusters, a Redis-backed adapter or edge reverse-proxy rate limiter (e.g. Cloudflare WAF or AWS ALB rate limiting) should be placed in front.

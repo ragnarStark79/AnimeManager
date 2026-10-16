@@ -18,9 +18,13 @@ export function createApp(): Express {
 
   // Security and core middleware
   app.use(helmet());
+  const allowedOrigins = config.CORS_ORIGIN.includes(',')
+    ? config.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+    : config.CORS_ORIGIN;
+
   app.use(
     cors({
-      origin: config.CORS_ORIGIN,
+      origin: allowedOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],

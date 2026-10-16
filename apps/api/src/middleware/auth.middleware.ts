@@ -25,10 +25,21 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
   const token = parts[1];
 
   try {
-    const decoded = jwt.verify(token, config.SUPABASE_JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, config.SUPABASE_JWT_SECRET, {
+      algorithms: ['HS256'],
+    }) as JwtPayload;
 
     if (!decoded || !decoded.sub || typeof decoded.sub !== 'string') {
       throw new UnauthorizedError('Invalid token claims: subject identifier (sub) missing');
+    }
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(decoded.sub)) {
+      throw new UnauthorizedError('Invalid token claims: subject identifier (sub) must be a valid UUID');
+    }
+
+    if (decoded.role === 'anon' || decoded.aud === 'anon') {
+      throw new UnauthorizedError('Invalid token claims: anonymous role not permitted for protected resources');
     }
 
     req.user = {

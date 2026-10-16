@@ -1,7 +1,7 @@
 # AnimeManager — Verification & Test Report
 
-**Document Version:** 2.1
-**Phase:** Phase 05.5 (Tenrai Metadata Provider Migration & Live Import Verification)
+**Document Version:** 2.2
+**Phase:** Phase 06 (Production Hardening, Security Audit & Release Readiness)
 **Date:** 2026-10-16
 
 ---
@@ -37,20 +37,31 @@ During **Phase 05.6**, AnimeManager connected its Express backend to hosted **Su
 - **Isolated Local Test Suite (`npm test`):** Local automated test runner preserved 100% test isolation, completing 139/139 tests against local test DB in ~2.4s.
 - **Comprehensive Documentation:** Produced root report `SUPABASE_DATABASE_INTEGRATION_REPORT.md` covering all 25 required sections.
 
+During **Phase 06**, AnimeManager underwent comprehensive production hardening and security review:
+- **Rate Limiting:** Implemented `RateLimiter` middleware setting standard `RateLimit-*` and `Retry-After` headers and throwing HTTP 429 `RateLimitError` on threshold breaches. Applied to `/api/v1/import` routes.
+- **Payload Limits:** Handled body-parser `entity.too.large` events returning HTTP 413 `PAYLOAD_TOO_LARGE` envelopes.
+- **Production Guard:** Added strict config validation throwing fatal errors in `NODE_ENV === 'production'` if `SUPABASE_JWT_SECRET` matches the default dev fallback string.
+- **JWT Whitelist:** Enforced `{ algorithms: ['HS256'] }` on token verification.
+- **CORS Multi-Origin:** Added comma-separated origin parsing in Express CORS configuration.
+- **Bundle Optimization:** Added `manualChunks` in Vite config, cutting app bundle size to ~245 kB and eliminating all build chunk warnings.
+- **Accessibility:** Added keyboard skip-to-content navigation and verified focus states.
+- **Test Suite Growth:** Added 6 new regression tests (`apps/api/test/hardening.test.js`), bringing automated tests to **145 / 145 passing** (5 shared + 89 API + 51 web). Plus 18 database assertions = **163 total passing checks**.
+
 ---
 
-## 2. Quality Gate Verification Matrix (Phases 01 through 05.6)
+## 2. Quality Gate Verification Matrix (Phases 01 through 06)
 
 | Check Category | Command Executed | Expected Outcome | Actual Result | Status |
 |---|---|---|---|---|
 | **Git Repository Safety** | `git status` | Clean status; no secrets or build artifacts untracked | `.env`, `node_modules`, `dist`, `.supabase` ignored properly | **PASS** |
 | **Linting Check** | `npm run lint` | Workspace lint scripts execute without error | Clean execution across all workspaces (shared, api, web) | **PASS** |
 | **TypeScript Check** | `npm run typecheck` | Strict TypeScript compilation across workspaces | Zero type errors in `shared`, `api`, `web` | **PASS** |
-| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 83 API + 51 web tests pass (139 total) | **PASS** |
+| **Monorepo Tests** | `npm test` | Node test runner verifies shared schemas, API suite, and web suite | 5 shared + 89 API + 51 web tests pass (145 total) | **PASS** |
 | **Frontend Unit Tests** | `npm --prefix apps/web test` | Node test runner verifies design tokens, components, search, QA, Phase 05 workflows, auth lifecycle, and import workflows | 51/51 frontend assertions pass cleanly | **PASS** |
-| **API Integration Tests**| `npm run test:api` | Node test runner executes integration, importer, export, auth, and Tenrai adapter suites | 83/83 test assertions passed cleanly | **PASS** |
-| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles; zero secret leaks in client assets | Built cleanly with type definitions and Vite client bundle; 0 leaks | **PASS** |
+| **API Integration Tests**| `npm run test:api` | Node test runner executes integration, importer, export, auth, Tenrai adapter, and hardening suites | 89/89 test assertions passed cleanly | **PASS** |
+| **Production Build** | `npm run build` | Workspaces compile to clean `dist/` bundles; zero secret leaks in client assets; zero chunk warnings | Built cleanly; JS split into <320 kB vendor/app chunks; 0 leaks | **PASS** |
 | **Database Verification** | `npm run test:db` | Migrations, seed, and 18 constraint assertions against live local PostgreSQL | All 18 database assertions passed cleanly | **PASS** |
+| **Hardening Regression** | `node --test apps/api/test/hardening.test.js` | Verifies rate limiting, 413 payload limit, JWT HS256 enforcement, CORS origins | All 6 hardening assertions passed cleanly | **PASS** |
 | **Remote Supabase DB Tests** | `ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:remote` | Probes live Supabase PostgreSQL for schema, RLS, triggers, constraints, isolation | All 23 assertions passed against Supabase | **PASS** |
 | **Remote Supabase Workflows**| `ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:workflows` | Exercises Title CRUD, Collections, Bookmarks, Import, Export against Supabase API | All 5 user workflows passed cleanly | **PASS** |
 | **Live Metadata Diagnostics** | `npm run test:metadata:live` | Probes live DNS, TLS, search, and detail endpoints against Tenrai v1 | All 8 live checks pass with HTTP 200/400 | **PASS** |

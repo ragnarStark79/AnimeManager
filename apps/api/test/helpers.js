@@ -17,17 +17,26 @@ export function createToken(ownerId, options = {}) {
   });
 }
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, '../../../');
+
 export function resetTestDatabase() {
   const psql = 'psql';
   const dbName = 'animemanager_test';
   const dbUser = process.env.PGUSER || 'ragnar';
 
+  const migration1 = path.join(repoRoot, 'supabase/migrations/20261014000001_initial_schema.sql');
+  const migration2 = path.join(repoRoot, 'supabase/migrations/20261014000002_security_policies.sql');
+  const seedSql = path.join(repoRoot, 'supabase/seed.sql');
+
   try {
     execSync(
       `${psql} -U ${dbUser} -d ${dbName} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" ` +
-      `-f ../../supabase/migrations/20261014000001_initial_schema.sql ` +
-      `-f ../../supabase/migrations/20261014000002_security_policies.sql ` +
-      `-f ../../supabase/seed.sql 2>&1`,
+      `-f "${migration1}" -f "${migration2}" -f "${seedSql}" 2>&1`,
       { stdio: 'ignore' }
     );
   } catch (err) {

@@ -21,6 +21,11 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
+      {/* Accessible skip link for keyboard navigation */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+
       {/* Decorative ambient light orbs */}
       <div className="ambience-orbs" aria-hidden="true">
         <div className="ambience-orb ambience-orb-1" />

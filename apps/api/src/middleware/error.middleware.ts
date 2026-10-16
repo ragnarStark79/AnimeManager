@@ -46,6 +46,19 @@ export function errorHandler(
     return;
   }
 
+  // Handle body-parser payload limit exceeded
+  if ('type' in err && (err as { type: string }).type === 'entity.too.large') {
+    res.status(413).json({
+      error: {
+        code: 'PAYLOAD_TOO_LARGE',
+        message: 'Request payload exceeds the maximum allowed size of 1MB',
+        details: [],
+      },
+      meta: { requestId, timestamp },
+    });
+    return;
+  }
+
   // Handle PostgreSQL specific constraint codes
   const pgErr = err as PgDatabaseError;
   if (pgErr.code === '23505') {

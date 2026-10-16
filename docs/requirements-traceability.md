@@ -1,8 +1,8 @@
 # AnimeManager — Requirements Traceability Matrix
 
-**Document Version:** 1.4
-**Phase:** Phase 04 Part 3 (Frontend Verification, Responsive QA & Phase Gate)
-**Status:** Requirements Mapped & Verified through Phase 04 Part 3
+**Document Version:** 1.5
+**Phase:** Phase 06 (Production Hardening, Security Audit & Release Readiness)
+**Status:** Requirements Mapped & Verified through Phase 06
 
 This matrix links every non-negotiable requirement, functional requirement (FR), and core user journey from `Personal_Media_Library_Full_Technical_Specification.md` and `Antigravity_Master_Build_Prompt.txt` to its target implementation phase, architectural component, and verification method.
 
@@ -19,12 +19,12 @@ This matrix links every non-negotiable requirement, functional requirement (FR),
 | **NNR-05** | Add titles manually or import via Jikan with preview and field editing before saving. | Phase 03, 05 | Jikan adapter, `ImportPage.tsx`, `AddTitleModal.tsx` | Integration & E2E tests | Verified (Phase 02, 03, & 05) |
 | **NNR-06** | Support English, original, alternate titles, synopsis, background, cover, genres, tags, external IDs, source score/rank, episode/chapter counts. | Phase 01, 02, 05 | Schema DDL, API DTOs, Detail view | Schema validation & API tests | Verified (Phase 01, 02, 03, & 05) |
 | **NNR-07** | **Do not import community reviews in v1.** | Phase 03 | Jikan adapter excludes review endpoints | Unit test inspecting payload | Verified (Phase 03) |
-| **NNR-08** | Use Supabase PostgreSQL and Supabase Storage (`covers` bucket). | Phase 01, 02, 05, 07 | Supabase client, SQL migrations, cover fallbacks | Database & migration tests, URL rendering | Verified (Phase 01, 02, & 05) |
+| **NNR-08** | Use Supabase PostgreSQL and Supabase Storage (`covers` bucket). | Phase 01, 02, 05, 07 | Supabase client, SQL migrations, cover fallbacks | Database & migration tests, URL rendering | Verified (Phase 01, 02, 05, & 05.6) |
 | **NNR-09** | Glassmorphism visual direction: cool blue/gray blurred backdrop, translucent surfaces, rounded cards, legible typography. | Phase 04 | `apps/web/src/styles/tokens.css`, `glassmorphism.css`, UI components | Automated design token tests, responsive audits | Verified (Phase 04 Parts 1, 2, & 3) |
-| **NNR-10** | Private-first deployment; access controls suitable for public internet; never expose service-role secrets to browser. | Phase 01, 02, 05, 06 | Supabase Auth, RLS, Express auth middleware, AuthProvider | Security audit, integration tests | Verified (Phase 01, 02, & 05) |
-| **NNR-11** | Never fetch arbitrary user-provided URLs (SSRF prevention). Parse supported MAL URL patterns, then call Jikan. | Phase 02, 03, 06 | URL parse regex validator, strict HTTP client | Unit test SSRF injection suite | Verified (Phase 03) |
+| **NNR-10** | Private-first deployment; access controls suitable for public internet; never expose service-role secrets to browser. | Phase 01, 02, 05, 06 | Supabase Auth, RLS, Express auth middleware, AuthProvider, RateLimiter | Security audit, JWT HS256 enforcement, integration tests | Verified (Phase 01, 02, 05, & 06) |
+| **NNR-11** | Never fetch arbitrary user-provided URLs (SSRF prevention). Parse supported MAL URL patterns, then call Jikan. | Phase 02, 03, 06 | URL parse regex validator, strict HTTP client, RateLimiter, 413 Payload defense | Unit test SSRF injection suite, payload limits | Verified (Phase 03 & 06) |
 | **NNR-12** | Jikan is external and can fail. Manual entry must always work. | Phase 03, 05 | Non-blocking Jikan error handling, manual title route, `AddTitleModal` | Mocked API failure tests, manual CRUD | Verified (Phase 02, 03, & 05) |
-| **NNR-13** | No fake hard-coded data as substitute for working persistence. | Phase 01–05 | Real PostgreSQL persistence across all features | Full stack E2E & API tests | Verified against DB (Phase 01, 02, 03, & 05) |
+| **NNR-13** | No fake hard-coded data as substitute for working persistence. | Phase 01–05 | Real PostgreSQL persistence across all features | Full stack E2E & API tests | Verified against DB (Phase 01, 02, 03, 05, & 05.6) |
 
 ---
 

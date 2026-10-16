@@ -85,3 +85,28 @@ export class DuplicateImportError extends AppError {
   }
 }
 
+export class PayloadTooLargeError extends AppError {
+  constructor(message = 'Request payload exceeds maximum size', details?: unknown[]) {
+    super(message, 413, 'PAYLOAD_TOO_LARGE', details);
+  }
+}
+
+export class RateLimitError extends AppError {
+  constructor(message = 'Too many requests, please try again later', details?: unknown[]) {
+    super(message, 429, 'RATE_LIMITED', details);
+  }
+}
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'Service temporarily unavailable', details?: unknown[]) {
+    super(message, 503, 'SERVICE_UNAVAILABLE', details);
+  }
+}
+
+export class DatabaseUnavailableError extends AppError {
+  constructor(message = 'Database service is temporarily unavailable. Please verify network connectivity.', details?: unknown[]) {
+    super(message, 503, 'DATABASE_UNAVAILABLE', details);
+  }
+}
+
+
