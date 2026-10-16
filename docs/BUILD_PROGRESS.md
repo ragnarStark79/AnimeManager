@@ -5,10 +5,10 @@
 **Project Name:** AnimeManager (Personal Media Library)  
 **Description:** A private-first personal catalog and tracking application for anime, manga, and manhwa. The application strictly distinguishes between **My List** (user-defined collections/folders) and **Bookmarks** (watch/read tracking status and progress). It integrates with MyAnimeList via the Jikan API for metadata import with preview and editing before saving, storing local copies in Supabase PostgreSQL and cover images in Supabase Storage. The visual aesthetic follows a modern, responsive glassmorphism design.
 
-- **Current Project Status:** Active Development
-- **Current Active Phase:** **Phase 05.6: Supabase PostgreSQL Integration, Remote Migrations, and Persistence Verification**
-- **Phase 05.6 Status:** **COMPLETED** (Connected application to hosted Supabase PostgreSQL 17.11 at `db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`; applied remote migrations creating 10 domain tables, 3 triggers, and 35 RLS policies; verified 23/23 remote database assertions via `npm run test:supabase:remote` and all 5 user workflows via `npm run test:supabase:workflows`; upgraded healthcheck to report schema readiness and target database; maintained 139/139 isolated local test suite; delivered root report [SUPABASE_DATABASE_INTEGRATION_REPORT.md](file:///Users/ragnar/Documents/Projects/AnimeManager/SUPABASE_DATABASE_INTEGRATION_REPORT.md))
-- **Next Phase:** **Phase 06: Hardening: Security, Accessibility, & Performance** (Pending user review and authorization; Phase 05.6 stop condition enforced)
+- **Current Project Status:** Hardened & Release-Ready (Pre-Deployment)
+- **Current Active Phase:** **Phase 06: Production Hardening, Security Audit, and Release Readiness**
+- **Phase 06 Status:** **COMPLETED** (Implemented sliding-window API rate limiter with RateLimit and Retry-After headers on import routes; 413 Payload Too Large error handling; production JWT fallback secret prevention; HS256 JWT algorithm enforcement; multi-origin CORS parsing; Vite manualChunks code-splitting eliminating bundle warnings; accessible skip-to-content navigation; 6 new hardening regression tests; 145/145 automated tests pass; 18/18 database assertions pass; root report [PHASE_06_HARDENING_REPORT.md](file:///Users/ragnar/Documents/Projects/AnimeManager/PHASE_06_HARDENING_REPORT.md) produced)
+- **Next Phase:** **Phase 07: Deployment Preparation & Production Verification** (Pending user review and authorization; Phase 06 stop condition strictly enforced; no deployment performed)
 
 ---
 
@@ -30,7 +30,7 @@
 | **Phase 05.4** | Definitive Jikan Diagnosis, Import Recovery & Technical Report | **COMPLETED** | Conclusively identified that public api.jikan.moe was retired on Oct 1, 2026; confirmed general outbound HTTPS is healthy (Google, GitHub, MAL); delivered root report `JIKAN_IMPORT_DIAGNOSTIC_REPORT.md` for independent review; enhanced dual-stack probe; added custom baseUrl tests (137 tests pass). |
 | **Phase 05.5** | Tenrai Migration & Live Import Verification | **COMPLETED** | Migrated upstream metadata provider from retired Jikan to Tenrai v1 API (`https://api.tenrai.org/v1`); implemented provider-neutral `MetadataClient` with bounded throttler (350ms) and caching; live verified search, preview, atomic commit, and duplicate protection; delivered root report `IMPORT_PROVIDER_MIGRATION_REPORT.md` (139 tests pass). |
 | **Phase 05.6** | Supabase PostgreSQL Integration, Remote Migrations & Persistence Verification | **COMPLETED** | Connected backend to hosted Supabase PostgreSQL (`db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`); applied remote migrations via Supabase CLI (`20261014000001`, `20261014000002`); verified 10 tables, 3 triggers, 35 RLS policies; created opt-in suites `npm run test:supabase:remote` (23 assertions) and `npm run test:supabase:workflows` (all user workflows); delivered root report `SUPABASE_DATABASE_INTEGRATION_REPORT.md`. |
-| **Phase 06** | Hardening: Security, Accessibility, & Performance | **PENDING REVIEW** | Server-side SSRF safeguards, image upload signature verification, accessibility audit (keyboard nav, ARIA, color contrast), glassmorphism performance optimization, and backup/restore rehearsal completed. Awaiting user authorization. |
+| **Phase 06** | Production Hardening, Security Audit & Release Readiness | **COMPLETED** | Server-side API rate limiting (`RateLimit-*` & `Retry-After` headers); 413 Payload Too Large error handling; production JWT secret validation; HS256 algorithm enforcement; CORS multi-origin parsing; Vite bundle chunk optimization (`manualChunks` sub-320 kB); accessible keyboard skip navigation; 145/145 automated tests; 18/18 database assertions; delivered root report `PHASE_06_HARDENING_REPORT.md`. Awaiting user authorization. |
 | **Phase 07** | Deployment Preparation & Production Verification | **NOT STARTED** | Frontend deployed to Vercel; Express API deployed to compatible Node host; Supabase production instance configured with RLS and Storage policies; smoke tests pass; rollback plan verified. |
 
 ---
@@ -446,6 +446,14 @@
 - Added regression tests in `apps/api/test/import-client.test.js` validating `MetadataClient`, safe URLSearchParams construction, and whitespace query rejection.
 - Monorepo automated test count increased to **139 / 139 passing** (5 shared + 83 API + 51 web), plus 18 database assertions = **157 / 157 total passing checks**.
 
+### Phase 05.6: Supabase PostgreSQL Integration, Remote Migrations & Persistence Verification
+- Connected application backend to hosted Supabase PostgreSQL 17.11 instance (`db.wbukfeqpsjwyaixwmpnc.supabase.co:5432`).
+- Applied canonical migrations idempotently (`20261014000001_initial_schema.sql` and `20261014000002_security_policies.sql`) via Supabase CLI, creating 10 domain tables, 3 triggers, and 35 Row Level Security policies.
+- Verified 23/23 remote database assertions via `ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:remote`.
+- Verified all 5 primary user workflows against Supabase PostgreSQL via `ALLOW_REMOTE_DB_TESTS=true npm run test:supabase:workflows`.
+- Maintained 100% test isolation for regular local development: `npm test` runs strictly against local test database `animemanager_test`.
+- Delivered comprehensive root report: `SUPABASE_DATABASE_INTEGRATION_REPORT.md`.
+
 ### Phase 06: Production Hardening, Security Audit & Release Readiness
 - **Server-Side API Rate Limiting (`apps/api/src/middleware/rate-limit.middleware.ts`):**
   - Implemented configurable sliding-window `RateLimiter` class tracking requests per authenticated user ID or client IP address.
@@ -498,3 +506,33 @@
   - Added 11 automated regression tests covering liveness/readiness, 503 error envelopes for titles, collections, bookmarks, and preview, 500 preservation for internal errors, working database preview and commit with duplicate detection, atomic rollback verification, and pool safety.
   - Total monorepo automated test count increased to **159 / 159 passing** (5 shared + 103 API + 51 web), plus 18 database assertions = **177 total passing checks**.
 - Delivered comprehensive root deliverable: **`PHASE_06_2_DATABASE_CONNECTIVITY_REPORT.md`** (uncommitted).
+
+### Phase 07: Deployment Preparation, Production Readiness & Verification
+- **Unified Vercel Monorepo Architecture Prepared:**
+  - Configured root `vercel.json` with monorepo build command (`npm run build`), static output directory (`apps/web/dist`), API routing (`/api/:path*` -> `/api`), and client-side SPA routing rewrite (`/((?!api/|assets/|favicon\\.svg).*)` -> `/index.html`).
+  - Implemented serverless function entrypoint `api/index.js` exporting the compiled Express application handler.
+  - Added dual route mounting (`/api/v1` and `/v1`) in `apps/api/src/app.ts` to ensure seamless route resolution under Vercel serverless function routing.
+- **Supavisor Transaction Pooler (Port 6543) Integration & Tuning:**
+  - Validated database connectivity against Supabase Tokyo pooler (`aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`).
+  - Optimized database connection pool in `apps/api/src/repositories/db.ts` for serverless concurrency: `max: process.env.VERCEL ? 3 : (config.NODE_ENV === 'test' ? 5 : 20)`, with `idleTimeoutMillis: 10000` under serverless functions to prevent connection exhaustion.
+  - Verified atomic transactions (`BEGIN ... COMMIT`), rollbacks, and parameterized queries through transaction pooler with 0 errors.
+  - Confirmed precedence: `SUPABASE_DATABASE_URL` takes precedence over `DATABASE_URL`; logs sanitize host:port and strictly omit credentials.
+- **Secret Hygiene & Static Bundle Audit:**
+  - Audited `.env` files; confirmed `.env` and `.env.local` are untracked by Git.
+  - Audited tracked files and commit history for credential leaks; zero exposed secrets found.
+  - Inspected production web bundle in `apps/web/dist`; verified zero server secrets or service-role keys are exposed.
+- **Full Quality Gate Verification:**
+  - Production build: `npm run build` completed with code 0 across all workspaces.
+  - Type checking: `npm run typecheck` passed with 0 errors across `@animemanager/shared`, `@animemanager/api`, `@animemanager/web`.
+  - Linting: `npm run lint` passed cleanly across all workspaces.
+  - Automated tests: 159 / 159 passing (5 shared, 103 API, 51 web).
+  - Database verification: 18 / 18 database assertions passing (`npm run test:db`).
+  - Metadata diagnostics: 8 / 8 Tenrai v1 live tests passing (`npm run test:metadata:live`).
+  - Healthcheck: direct API (port 4000) and frontend proxy (port 5173) fully operational.
+  - Total verified assertions: **177 automated quality checks passing**.
+- **Documentation & Deliverables:**
+  - Updated `docs/deployment.md` with complete, step-by-step Vercel deployment guide, environment variables reference, Supabase storage bucket setup, smoke tests, and rollback procedures.
+  - Delivered comprehensive root deliverable: **`PHASE_07_DEPLOYMENT_READINESS_REPORT.md`** (uncommitted).
+  - Strict stop condition enforced: Ready after manual configuration; no automated commits or deployments performed.
+
+

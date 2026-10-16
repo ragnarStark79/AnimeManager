@@ -10,8 +10,8 @@ const isRemote =
 
 export const pool = new Pool({
   connectionString: config.DATABASE_URL,
-  max: config.NODE_ENV === 'test' ? 5 : 20,
-  idleTimeoutMillis: 30000,
+  max: process.env.VERCEL ? 3 : (config.NODE_ENV === 'test' ? 5 : 20),
+  idleTimeoutMillis: process.env.VERCEL ? 10000 : 30000,
   connectionTimeoutMillis: 10000,
   ssl: isRemote ? { rejectUnauthorized: false } : undefined,
 });

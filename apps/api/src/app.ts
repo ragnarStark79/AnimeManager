@@ -34,7 +34,7 @@ export function createApp(): Express {
   app.use(express.json({ limit: '1mb' }));
   app.use(requestIdMiddleware);
 
-  // Mount API v1 routes
+  // Mount API v1 routes (supports direct /api/v1 and serverless /v1 mounts)
   const apiRouter = express.Router();
   apiRouter.use(healthRouter);
   apiRouter.use(authRouter);
@@ -45,6 +45,7 @@ export function createApp(): Express {
   apiRouter.use(exportRouter);
 
   app.use('/api/v1', apiRouter);
+  app.use('/v1', apiRouter);
 
   // 404 handler for unknown endpoints
   app.use((_req, _res, next) => {
